@@ -51,7 +51,7 @@ async def delete_blacklist(blacklist_id: int, user: AppUser = Depends(get_curren
     if user.role not in _ALLOWED:
         raise HTTPException(403, "Admins only")
     async with get_session() as session:
-        ok = await remove_from_blacklist(session, blacklist_id)
+        ok = await remove_from_blacklist(session, blacklist_id, removed_by=user.actor)
     if not ok:
         raise HTTPException(404, "Entry not found or already removed")
     return {"id": blacklist_id, "status": "removed"}

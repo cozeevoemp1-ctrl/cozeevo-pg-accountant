@@ -23,6 +23,22 @@ from typing import Optional
 import httpx
 from loguru import logger
 
+# Single source for the Groq model id. llama-3.3-70b-versatile was decommissioned
+# (silently 404s) — never hardcode a model id elsewhere; call groq_model().
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+
+
+def groq_model() -> str:
+    """Groq model id from GROQ_MODEL env (read at call time, after dotenv)."""
+    return os.getenv("GROQ_MODEL") or DEFAULT_GROQ_MODEL
+
+
+def groq_payload_extras() -> dict:
+    """Extra chat-completion params for the configured model. gpt-oss models
+    reason before answering; without reasoning_effort=low the hidden reasoning
+    can eat the whole max_tokens budget and return empty content."""
+    return {"reasoning_effort": "low"} if "gpt-oss" in groq_model() else {}
+
 from src.llm_gateway.prompts import (
     MERCHANT_CLASSIFY_PROMPT,
     INTENT_DETECT_PROMPT,
@@ -68,7 +84,7 @@ class _GroqBackend:
         if not self.api_key:
             raise RuntimeError("GROQ_API_KEY not set. Get a free key at https://console.groq.com")
         self.url   = "https://api.groq.com/openai/v1/chat/completions"
-        self.model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.model = groq_model()
 
     async def call(self, prompt: str) -> str:
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
@@ -77,6 +93,7 @@ class _GroqBackend:
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.0,
             "max_tokens": 512,
+            **groq_payload_extras(),
         }
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(self.url, headers=headers, json=payload)

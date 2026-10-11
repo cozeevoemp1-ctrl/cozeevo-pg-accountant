@@ -34,6 +34,7 @@ from src.database.models import PendingAction, PendingLearning, WhatsappLog, Mes
 from src.whatsapp.role_service import get_caller_context
 from src.whatsapp.intent_detector import detect_intent, IntentResult, _extract_entities, _INTENT_LABELS
 from src.whatsapp.gatekeeper import route
+from src.whatsapp.handlers.account_handler import FINANCIAL_INTENTS as _FIN_INTENTS
 from src.whatsapp.handlers.owner_handler import resolve_pending_action, handle_learn_command, _extract_checkout_from_image
 from src.whatsapp.handlers.tenant_handler import get_active_onboarding, handle_onboarding_step, resolve_tenant_complaint
 from src.llm_gateway.claude_client import get_claude_client
@@ -347,21 +348,6 @@ async def _process_message_inner(
                     await session.commit()
                     return OutboundReply(reply=cls_reply, intent="MEDIA_CLASSIFY", role=ctx.role)
 
-            # ── RECEIPT_NO_PAYMENT: receipt uploaded but no payment found, user typing payment details ──
-            if not pending.resolved and pending.intent == "RECEIPT_NO_PAYMENT":
-                # User should type "Raj 15000 cash april" — treat as PAYMENT_LOG
-                import json as _jn
-                action_data = _jn.loads(pending.action_data or "{}")
-                pending.resolved = True
-                # Re-inject as a payment log with the saved receipt
-                intent_result = detect_intent(message, ctx.role)
-                if intent_result.intent == "PAYMENT_LOG":
-                    intent_result.entities["_receipt_file_path"] = action_data.get("file_path", "")
-                    reply = await route("PAYMENT_LOG", intent_result.entities, ctx, message, session)
-                    await _log(session, phone, message, ctx.role, "PAYMENT_LOG", reply)
-                    await session.commit()
-                    return OutboundReply(reply=reply, intent="PAYMENT_LOG", role=ctx.role)
-
             # ── AWAITING_CLARIFICATION: bot asked follow-up, this is the answer ──
             if not pending.resolved and pending.intent == "AWAITING_CLARIFICATION":
                 import json as _jc
@@ -547,7 +533,7 @@ async def _process_message_inner(
     # ── LangGraph active-thread fast-path ────────────────────────────
     # Must run BEFORE the PydanticAI path — "yes" gets classified as UNKNOWN
     # and would otherwise hit the converse handler and never reach the agent.
-    if _USE_PYDANTIC_AGENTS and ctx.role in ("admin", "owner", "receptionist") and intent not in _AGENT_INTENTS:
+    if _USE_PYDANTIC_AGENTS and ctx.role in ("admin", "owner", "receptionist") and intent not in _AGENT_INTENTS and intent not in _FIN_INTENTS:
         try:
             from src.agent.graph import get_graph as _get_graph
             _st = await _get_graph().aget_state({"configurable": {"thread_id": f"wa:{phone}"}})
@@ -665,16 +651,15 @@ async def _process_message_inner(
         except Exception as e:
             _chat_logger.warning("Groq intent detection failed: %s — using regex result", e)
 
-    # ── 3a. Image + expense keyword = always LOG (not query) ──
-    if body.media_id and body.media_type == "image" and intent in ("QUERY_EXPENSES", "UNKNOWN"):
-        _EXPENSE_KW = re.compile(r"\b(eb|bill|electricity|water|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|receipt)\b", re.I)
-        if _EXPENSE_KW.search(message):
-            intent = "ADD_EXPENSE"
-            intent_result = IntentResult(intent="ADD_EXPENSE", confidence=0.90, entities=intent_result.entities)
-            _chat_logger.info("Image + expense keyword: forced ADD_EXPENSE for %s", phone)
-
-    # ── 3a2. Image with no specific intent → media classify + receipt handler ──
-    if body.media_id and body.media_type == "image" and intent in ("UNKNOWN", "GENERAL"):
+    # ── 3a. Image with no specific intent, or a finance caption ("EB bill 5000",
+    # "Raj paid 8000 upi") → media handler. Finance entry is app-only (gatekeeper
+    # FINANCIAL_INTENTS), so the image is saved/attached as a document and the
+    # reply points to the Kozzy app instead of dead-ending in the finance block.
+    # An uncaptioned image always goes here: the LLM fallback classifies the
+    # empty text as HELP/greeting, which used to answer a photo with the menu.
+    if body.media_id and body.media_type == "image" and (
+        not message.strip() or intent in ("UNKNOWN", "GENERAL") or intent in _FIN_INTENTS
+    ):
         from src.whatsapp.handlers.receipt_handler import handle_media_upload
         media_reply = await handle_media_upload(
             media_id=body.media_id, media_mime=body.media_mime or "image/jpeg",
@@ -901,7 +886,9 @@ async def _process_message_inner(
         except Exception:
             pass
 
-    if _USE_PYDANTIC_AGENTS and (_agent_has_active_thread or intent in _AGENT_INTENTS) and ctx.role in ("admin", "owner", "receptionist"):
+    # Finance intents never reach the agent (default AGENT_INTENTS includes
+    # PAYMENT_LOG) — they must hit the gatekeeper's Kozzy-app block.
+    if _USE_PYDANTIC_AGENTS and intent not in _FIN_INTENTS and (_agent_has_active_thread or intent in _AGENT_INTENTS) and ctx.role in ("admin", "owner", "receptionist"):
         try:
             from src.agent.graph import run_agent
             pg_id = await _resolve_pg_id(session)
@@ -983,30 +970,27 @@ def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict
             "footer": {"text": "Cozeevo Co-living"},
             "action": {
                 "button": "View Services",
+                # No finance rows: every FINANCIAL_INTENT is blocked on WhatsApp
+                # (gatekeeper) — a menu entry for one is a dead end.
                 "sections": [
-                    {
-                        "title": "Rent & Payments",
-                        "rows": [
-                            {"id": "PAYMENT_LOG",  "title": "Log Payment",      "description": "Record rent received"},
-                            {"id": "QUERY_DUES",   "title": "Who Owes",          "description": "Pending dues list"},
-                            {"id": "REPORT",       "title": "Monthly Report",    "description": "Income & expense summary"},
-                        ],
-                    },
                     {
                         "title": "Tenants & Rooms",
                         "rows": [
                             {"id": "ADD_TENANT",     "title": "Check-in",        "description": "New tenant (text or photo)"},
                             {"id": "CHECKOUT",       "title": "Checkout",        "description": "Exit process (text or photo)"},
-                            {"id": "QUERY_TENANT",   "title": "Tenant Info",     "description": "Balance & payment history"},
                             {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms", "description": "Empty beds by floor"},
+                            {"id": "QUERY_OCCUPANCY", "title": "Occupancy",      "description": "Beds filled vs total"},
                         ],
                     },
                     {
                         "title": "Operations",
                         "rows": [
-                            {"id": "ADD_EXPENSE",        "title": "Log Expense",     "description": "EB, salary, maintenance"},
+                            # No "Send Reminders": tenant reminders are off by rule (no automated tenant comms).
                             {"id": "COMPLAINT_REGISTER", "title": "Report Issue",    "description": "Plumbing, electric, wifi"},
-                            {"id": "SEND_REMINDER_ALL",  "title": "Send Reminders",  "description": "Remind all unpaid tenants"},
+                            {"id": "QUERY_COMPLAINTS",   "title": "Open Complaints", "description": "List unresolved issues"},
+                            {"id": "QUERY_CONTACTS",     "title": "Vendor Contacts", "description": "Plumber, electrician..."},
+                            {"id": "GET_WIFI_PASSWORD",  "title": "WiFi Password",   "description": "Network names & passwords"},
+                            {"id": "RULES",              "title": "PG Rules",        "description": "House rules"},
                         ],
                     },
                 ],

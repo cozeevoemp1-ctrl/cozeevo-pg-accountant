@@ -165,6 +165,23 @@ def is_negative(text: str) -> bool:
 
 # ── Fuzzy tenant search helpers ───────────────────────────────────────────────
 
+def surname_resembles(query_name: str, tenant_name: str) -> bool:
+    """For a multi-word query that matched only on first name: does any later word of
+    the query resemble a later word of the tenant's name? Allows prefixes and typos
+    ("Vidya Duta" → "Vidya Dutta") but rejects a different surname ("Zorawar Qwertyuiop"
+    must not resolve to the only "Zorawar" — a single match is acted on without asking).
+    Single-word queries always pass."""
+    rest_q = (query_name or "").lower().split()[1:]
+    if not rest_q:
+        return True
+    rest_n = (tenant_name or "").lower().split()[1:]
+    return any(
+        n.startswith(q) or q.startswith(n)
+        or difflib.SequenceMatcher(None, q, n).ratio() >= 0.75
+        for q in rest_q for n in rest_n
+    )
+
+
 async def _find_active_tenants_by_name(name: str, session: AsyncSession):
     """
     Returns list of (Tenant, Tenancy, Room) tuples matching the name.
@@ -199,6 +216,23 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
     if len(first_word) >= 3:
         rows = await _search(f"{first_word}%")
         if rows:
+            # A full name ("Vidya Dutta") must not fan out to every "Vidya" —
+            # narrow to the rows whose name contains the whole query; keep the
+            # first-name list only when nothing matches the full name.
+            if " " in name.strip():
+                full = " ".join(name.lower().split())
+                narrowed = [r for r in rows if full in " ".join((r[0].name or "").lower().split())]
+                if narrowed:
+                    rows = narrowed
+                else:
+                    # A surname was given but no full-name match: keep only candidates
+                    # whose other name words resemble it. "Zorawar Qwertyuiop" must NOT
+                    # resolve to the only "Zorawar" (a single match is acted on silently);
+                    # "Vidya Duta" (typo) must still find "Vidya Dutta".
+                    rows = [r for r in rows if surname_resembles(name, r[0].name)]
+                    if not rows:
+                        logger.info(f"[_find_active_tenants_by_name] ✗ first name found but surname in '{name}' matches nobody")
+                        return []
             logger.info(f"[_find_active_tenants_by_name] ✓ Step 1 (first-name) found: {[r[0].name for r in rows]}")
             return rows
 
@@ -555,7 +589,7 @@ async def _find_daywise_by_name(name: str, session: AsyncSession) -> list:
         .order_by(DaywiseStay.checkin_date.desc())
         .limit(5)
     )
-    rows = result.scalars().all()
+    rows = [r for r in result.scalars().all() if surname_resembles(name, r.guest_name)]
     if not rows and len(name) >= 3:
         result = await session.execute(
             select(DaywiseStay)

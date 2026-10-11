@@ -1,0 +1,3405 @@
+{
+ "area": "gate",
+ "cases": [
+  {
+   "id": "G-001",
+   "intent": "BLOCKED",
+   "phone": "919999900001",
+   "desc": "blocked 919999900001 gets silence for every message",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_silent": true
+    },
+    {
+     "msg": "help",
+     "expect_silent": true
+    },
+    {
+     "msg": "what is my balance",
+     "expect_silent": true
+    },
+    {
+     "msg": "Pratik paid 5000 cash",
+     "expect_silent": true
+    },
+    {
+     "msg": "approve 5",
+     "expect_silent": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_silent": true
+    },
+    {
+     "msg": "who owes",
+     "expect_silent": true
+    },
+    {
+     "msg": "occupancy",
+     "expect_silent": true
+    },
+    {
+     "msg": "checkout room 109",
+     "expect_silent": true
+    },
+    {
+     "msg": "no water in my room",
+     "expect_silent": true
+    },
+    {
+     "msg": "menu",
+     "expect_silent": true
+    },
+    {
+     "msg": "my rent receipt",
+     "expect_silent": true
+    }
+   ]
+  },
+  {
+   "id": "G-002",
+   "intent": "BLOCKED",
+   "phone": "919000000000",
+   "desc": "blocked 919000000000 gets silence for every message",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_silent": true
+    },
+    {
+     "msg": "help",
+     "expect_silent": true
+    },
+    {
+     "msg": "what is my balance",
+     "expect_silent": true
+    },
+    {
+     "msg": "Pratik paid 5000 cash",
+     "expect_silent": true
+    },
+    {
+     "msg": "approve 5",
+     "expect_silent": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_silent": true
+    },
+    {
+     "msg": "who owes",
+     "expect_silent": true
+    },
+    {
+     "msg": "occupancy",
+     "expect_silent": true
+    },
+    {
+     "msg": "checkout room 109",
+     "expect_silent": true
+    },
+    {
+     "msg": "no water in my room",
+     "expect_silent": true
+    },
+    {
+     "msg": "menu",
+     "expect_silent": true
+    },
+    {
+     "msg": "my rent receipt",
+     "expect_silent": true
+    }
+   ]
+  },
+  {
+   "id": "G-003",
+   "intent": "BLOCKED",
+   "phone": "919000000002",
+   "desc": "blocked 919000000002 gets silence for every message",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_silent": true
+    },
+    {
+     "msg": "help",
+     "expect_silent": true
+    },
+    {
+     "msg": "what is my balance",
+     "expect_silent": true
+    },
+    {
+     "msg": "Pratik paid 5000 cash",
+     "expect_silent": true
+    },
+    {
+     "msg": "approve 5",
+     "expect_silent": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_silent": true
+    },
+    {
+     "msg": "who owes",
+     "expect_silent": true
+    },
+    {
+     "msg": "occupancy",
+     "expect_silent": true
+    },
+    {
+     "msg": "checkout room 109",
+     "expect_silent": true
+    },
+    {
+     "msg": "no water in my room",
+     "expect_silent": true
+    },
+    {
+     "msg": "menu",
+     "expect_silent": true
+    },
+    {
+     "msg": "my rent receipt",
+     "expect_silent": true
+    }
+   ]
+  },
+  {
+   "id": "G-004",
+   "intent": "HELP",
+   "phone": "917845952289",
+   "desc": "staff hi/help gets a reply",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_any": [
+      "kozzy",
+      "help",
+      "cozeevo",
+      "hi",
+      "hello"
+     ]
+    },
+    {
+     "msg": "occupancy",
+     "expect_intent": "QUERY_OCCUPANCY",
+     "expect_contains": [
+      "beds"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-005",
+   "intent": "APPROVE_STUB",
+   "phone": "917845952289",
+   "desc": "approve/reject N not the dead stub",
+   "turns": [
+    {
+     "msg": "approve 5",
+     "expect_not_contains": [
+      "Approved:",
+      "Not found: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_not_contains": [
+      "Rejected: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    }
+   ]
+  },
+  {
+   "id": "G-006",
+   "intent": "HELP",
+   "phone": "917358341775",
+   "desc": "staff hi/help gets a reply",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_any": [
+      "kozzy",
+      "help",
+      "cozeevo",
+      "hi",
+      "hello"
+     ]
+    },
+    {
+     "msg": "occupancy",
+     "expect_intent": "QUERY_OCCUPANCY",
+     "expect_contains": [
+      "beds"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-007",
+   "intent": "APPROVE_STUB",
+   "phone": "917358341775",
+   "desc": "approve/reject N not the dead stub",
+   "turns": [
+    {
+     "msg": "approve 5",
+     "expect_not_contains": [
+      "Approved:",
+      "Not found: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_not_contains": [
+      "Rejected: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    }
+   ]
+  },
+  {
+   "id": "G-008",
+   "intent": "HELP",
+   "phone": "919444296681",
+   "desc": "staff hi/help gets a reply",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_any": [
+      "kozzy",
+      "help",
+      "cozeevo",
+      "hi",
+      "hello"
+     ]
+    },
+    {
+     "msg": "occupancy",
+     "expect_intent": "QUERY_OCCUPANCY",
+     "expect_contains": [
+      "beds"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-009",
+   "intent": "APPROVE_STUB",
+   "phone": "919444296681",
+   "desc": "approve/reject N not the dead stub",
+   "turns": [
+    {
+     "msg": "approve 5",
+     "expect_not_contains": [
+      "Approved:",
+      "Not found: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_not_contains": [
+      "Rejected: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    }
+   ]
+  },
+  {
+   "id": "G-010",
+   "intent": "HELP",
+   "phone": "917680814628",
+   "desc": "staff hi/help gets a reply",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_any": [
+      "kozzy",
+      "help",
+      "cozeevo",
+      "hi",
+      "hello"
+     ]
+    },
+    {
+     "msg": "occupancy",
+     "expect_intent": "QUERY_OCCUPANCY",
+     "expect_contains": [
+      "beds"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-011",
+   "intent": "APPROVE_STUB",
+   "phone": "917680814628",
+   "desc": "approve/reject N not the dead stub",
+   "turns": [
+    {
+     "msg": "approve 5",
+     "expect_not_contains": [
+      "Approved:",
+      "Not found: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    },
+    {
+     "msg": "reject 5",
+     "expect_not_contains": [
+      "Rejected: #"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "allow_empty": true
+    }
+   ]
+  },
+  {
+   "id": "G-012",
+   "intent": "HELP",
+   "phone": "917680814628",
+   "desc": "receptionist help lists no finance command",
+   "turns": [
+    {
+     "msg": "help",
+     "expect_intent": "HELP",
+     "expect_contains": [
+      "Kozzy app"
+     ],
+     "expect_not_contains": [
+      "Raj paid",
+      "who owes",
+      "void payment",
+      "Raj balance",
+      "log EB bill"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-013",
+   "intent": "CHIT_QUERY",
+   "phone": "917358341775",
+   "desc": "chit register not visible to non-chit phones",
+   "turns": [
+    {
+     "msg": "show chits",
+     "expect_not_contains": [
+      "chit register",
+      "S.No"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-014",
+   "intent": "CHIT_QUERY",
+   "phone": "917680814628",
+   "desc": "chit register not visible to non-chit phones",
+   "turns": [
+    {
+     "msg": "show chits",
+     "expect_not_contains": [
+      "chit register",
+      "S.No"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "G-015",
+   "intent": "PAYMENT_LOG",
+   "phone": "917845952289",
+   "desc": "finance block: Pratik Rastogi paid 14000 cash",
+   "turns": [
+    {
+     "msg": "Pratik Rastogi paid 14000 cash",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-016",
+   "intent": "PAYMENT_LOG",
+   "phone": "917358341775",
+   "desc": "finance block: Pratik Rastogi paid 14000 cash",
+   "turns": [
+    {
+     "msg": "Pratik Rastogi paid 14000 cash",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-017",
+   "intent": "PAYMENT_LOG",
+   "phone": "919444296681",
+   "desc": "finance block: Pratik Rastogi paid 14000 cash",
+   "turns": [
+    {
+     "msg": "Pratik Rastogi paid 14000 cash",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-018",
+   "intent": "PAYMENT_LOG",
+   "phone": "917680814628",
+   "desc": "finance block: Pratik Rastogi paid 14000 cash",
+   "turns": [
+    {
+     "msg": "Pratik Rastogi paid 14000 cash",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-019",
+   "intent": "PAYMENT_LOG",
+   "phone": "917358341775",
+   "desc": "finance block: received 8000 upi from room 609",
+   "turns": [
+    {
+     "msg": "received 8000 upi from room 609",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-020",
+   "intent": "PAYMENT_LOG",
+   "phone": "919444296681",
+   "desc": "finance block: collect rent 12000 from Varun gpay",
+   "turns": [
+    {
+     "msg": "collect rent 12000 from Varun gpay",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-021",
+   "intent": "PAYMENT_LOG",
+   "phone": "917680814628",
+   "desc": "finance block: Madhuri 9000 upi",
+   "turns": [
+    {
+     "msg": "Madhuri 9000 upi",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-022",
+   "intent": "PAYMENT_LOG",
+   "phone": "917845952289",
+   "desc": "finance block: room 407 paid 5000 cash",
+   "turns": [
+    {
+     "msg": "room 407 paid 5000 cash",
+     "expect_intent": "PAYMENT_LOG",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-023",
+   "intent": "QUERY_DUES",
+   "phone": "917845952289",
+   "desc": "finance block: who owes",
+   "turns": [
+    {
+     "msg": "who owes",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-024",
+   "intent": "QUERY_DUES",
+   "phone": "917358341775",
+   "desc": "finance block: who owes",
+   "turns": [
+    {
+     "msg": "who owes",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-025",
+   "intent": "QUERY_DUES",
+   "phone": "919444296681",
+   "desc": "finance block: who owes",
+   "turns": [
+    {
+     "msg": "who owes",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-026",
+   "intent": "QUERY_DUES",
+   "phone": "917680814628",
+   "desc": "finance block: who owes",
+   "turns": [
+    {
+     "msg": "who owes",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-027",
+   "intent": "QUERY_DUES",
+   "phone": "917358341775",
+   "desc": "finance block: pending dues list",
+   "turns": [
+    {
+     "msg": "pending dues list",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-028",
+   "intent": "QUERY_DUES",
+   "phone": "919444296681",
+   "desc": "finance block: show dues",
+   "turns": [
+    {
+     "msg": "show dues",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-029",
+   "intent": "QUERY_DUES",
+   "phone": "917680814628",
+   "desc": "finance block: kisne nahi diya",
+   "turns": [
+    {
+     "msg": "kisne nahi diya",
+     "expect_intent": "QUERY_DUES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-030",
+   "intent": "QUERY_RECEIPT",
+   "phone": "917845952289",
+   "desc": "finance block: receipt for Pratik",
+   "turns": [
+    {
+     "msg": "receipt for Pratik",
+     "expect_intent": "QUERY_RECEIPT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-031",
+   "intent": "QUERY_RECEIPT",
+   "phone": "917358341775",
+   "desc": "finance block: receipt for Pratik",
+   "turns": [
+    {
+     "msg": "receipt for Pratik",
+     "expect_intent": "QUERY_RECEIPT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-032",
+   "intent": "QUERY_RECEIPT",
+   "phone": "919444296681",
+   "desc": "finance block: receipt for Pratik",
+   "turns": [
+    {
+     "msg": "receipt for Pratik",
+     "expect_intent": "QUERY_RECEIPT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-033",
+   "intent": "QUERY_RECEIPT",
+   "phone": "917680814628",
+   "desc": "finance block: receipt for Pratik",
+   "turns": [
+    {
+     "msg": "receipt for Pratik",
+     "expect_intent": "QUERY_RECEIPT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-034",
+   "intent": "QUERY_RECEIPT",
+   "phone": "917358341775",
+   "desc": "finance block: send receipt to room 609",
+   "turns": [
+    {
+     "msg": "send receipt to room 609",
+     "expect_intent": "QUERY_RECEIPT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-035",
+   "intent": "QUERY_RECEIPT",
+   "phone": "919444296681",
+   "desc": "finance block: show receipt of Madhuri's payment",
+   "turns": [
+    {
+     "msg": "show receipt of Madhuri's payment",
+     "expect_intent": "QUERY_RECEIPT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-036",
+   "intent": "QUERY_TENANT",
+   "phone": "917845952289",
+   "desc": "finance block: balance of Pratik",
+   "turns": [
+    {
+     "msg": "balance of Pratik",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-037",
+   "intent": "QUERY_TENANT",
+   "phone": "917358341775",
+   "desc": "finance block: balance of Pratik",
+   "turns": [
+    {
+     "msg": "balance of Pratik",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-038",
+   "intent": "QUERY_TENANT",
+   "phone": "919444296681",
+   "desc": "finance block: balance of Pratik",
+   "turns": [
+    {
+     "msg": "balance of Pratik",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-039",
+   "intent": "QUERY_TENANT",
+   "phone": "917680814628",
+   "desc": "finance block: balance of Pratik",
+   "turns": [
+    {
+     "msg": "balance of Pratik",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-040",
+   "intent": "QUERY_TENANT",
+   "phone": "917358341775",
+   "desc": "finance block: Varun Reddy dues",
+   "turns": [
+    {
+     "msg": "Varun Reddy dues",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-041",
+   "intent": "QUERY_TENANT",
+   "phone": "919444296681",
+   "desc": "finance block: room 407 balance",
+   "turns": [
+    {
+     "msg": "room 407 balance",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-042",
+   "intent": "QUERY_TENANT",
+   "phone": "917680814628",
+   "desc": "finance block: did Vikram pay",
+   "turns": [
+    {
+     "msg": "did Vikram pay",
+     "expect_intent": "QUERY_TENANT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-043",
+   "intent": "ADD_EXPENSE",
+   "phone": "917845952289",
+   "desc": "finance block: add expense plumber 1500",
+   "turns": [
+    {
+     "msg": "add expense plumber 1500",
+     "expect_intent": "ADD_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-044",
+   "intent": "ADD_EXPENSE",
+   "phone": "917358341775",
+   "desc": "finance block: add expense plumber 1500",
+   "turns": [
+    {
+     "msg": "add expense plumber 1500",
+     "expect_intent": "ADD_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-045",
+   "intent": "ADD_EXPENSE",
+   "phone": "919444296681",
+   "desc": "finance block: add expense plumber 1500",
+   "turns": [
+    {
+     "msg": "add expense plumber 1500",
+     "expect_intent": "ADD_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-046",
+   "intent": "ADD_EXPENSE",
+   "phone": "917680814628",
+   "desc": "finance block: add expense plumber 1500",
+   "turns": [
+    {
+     "msg": "add expense plumber 1500",
+     "expect_intent": "ADD_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-047",
+   "intent": "ADD_EXPENSE",
+   "phone": "917358341775",
+   "desc": "finance block: paid salary 20000 to cook",
+   "turns": [
+    {
+     "msg": "paid salary 20000 to cook",
+     "expect_intent": "ADD_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-048",
+   "intent": "ADD_EXPENSE",
+   "phone": "919444296681",
+   "desc": "finance block: electricity 5000",
+   "turns": [
+    {
+     "msg": "electricity 5000",
+     "expect_intent": "ADD_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-049",
+   "intent": "QUERY_EXPENSES",
+   "phone": "917845952289",
+   "desc": "finance block: show expenses",
+   "turns": [
+    {
+     "msg": "show expenses",
+     "expect_intent": "QUERY_EXPENSES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-050",
+   "intent": "QUERY_EXPENSES",
+   "phone": "917358341775",
+   "desc": "finance block: show expenses",
+   "turns": [
+    {
+     "msg": "show expenses",
+     "expect_intent": "QUERY_EXPENSES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-051",
+   "intent": "QUERY_EXPENSES",
+   "phone": "919444296681",
+   "desc": "finance block: show expenses",
+   "turns": [
+    {
+     "msg": "show expenses",
+     "expect_intent": "QUERY_EXPENSES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-052",
+   "intent": "QUERY_EXPENSES",
+   "phone": "917680814628",
+   "desc": "finance block: show expenses",
+   "turns": [
+    {
+     "msg": "show expenses",
+     "expect_intent": "QUERY_EXPENSES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-053",
+   "intent": "QUERY_EXPENSES",
+   "phone": "917358341775",
+   "desc": "finance block: expenses this month",
+   "turns": [
+    {
+     "msg": "expenses this month",
+     "expect_intent": "QUERY_EXPENSES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-054",
+   "intent": "QUERY_EXPENSES",
+   "phone": "919444296681",
+   "desc": "finance block: list expenses",
+   "turns": [
+    {
+     "msg": "list expenses",
+     "expect_intent": "QUERY_EXPENSES",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-055",
+   "intent": "REPORT",
+   "phone": "917845952289",
+   "desc": "finance block: monthly report",
+   "turns": [
+    {
+     "msg": "monthly report",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-056",
+   "intent": "REPORT",
+   "phone": "917358341775",
+   "desc": "finance block: monthly report",
+   "turns": [
+    {
+     "msg": "monthly report",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-057",
+   "intent": "REPORT",
+   "phone": "919444296681",
+   "desc": "finance block: monthly report",
+   "turns": [
+    {
+     "msg": "monthly report",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-058",
+   "intent": "REPORT",
+   "phone": "917680814628",
+   "desc": "finance block: monthly report",
+   "turns": [
+    {
+     "msg": "monthly report",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-059",
+   "intent": "REPORT",
+   "phone": "917358341775",
+   "desc": "finance block: report for september",
+   "turns": [
+    {
+     "msg": "report for september",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-060",
+   "intent": "REPORT",
+   "phone": "919444296681",
+   "desc": "finance block: how much did we spend on electricity",
+   "turns": [
+    {
+     "msg": "how much did we spend on electricity",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-061",
+   "intent": "REPORT",
+   "phone": "917680814628",
+   "desc": "finance block: show summary",
+   "turns": [
+    {
+     "msg": "show summary",
+     "expect_intent": "REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-062",
+   "intent": "RENT_CHANGE",
+   "phone": "917845952289",
+   "desc": "finance block: change rent of room 609 to 14000",
+   "turns": [
+    {
+     "msg": "change rent of room 609 to 14000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-063",
+   "intent": "RENT_CHANGE",
+   "phone": "917358341775",
+   "desc": "finance block: change rent of room 609 to 14000",
+   "turns": [
+    {
+     "msg": "change rent of room 609 to 14000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-064",
+   "intent": "RENT_CHANGE",
+   "phone": "919444296681",
+   "desc": "finance block: change rent of room 609 to 14000",
+   "turns": [
+    {
+     "msg": "change rent of room 609 to 14000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-065",
+   "intent": "RENT_CHANGE",
+   "phone": "917680814628",
+   "desc": "finance block: change rent of room 609 to 14000",
+   "turns": [
+    {
+     "msg": "change rent of room 609 to 14000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-066",
+   "intent": "RENT_CHANGE",
+   "phone": "917358341775",
+   "desc": "finance block: increase rent for Pratik to 15000",
+   "turns": [
+    {
+     "msg": "increase rent for Pratik to 15000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-067",
+   "intent": "RENT_CHANGE",
+   "phone": "919444296681",
+   "desc": "finance block: update rent for Varun to 13000",
+   "turns": [
+    {
+     "msg": "update rent for Varun to 13000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-068",
+   "intent": "RENT_DISCOUNT",
+   "phone": "917845952289",
+   "desc": "finance block: give discount 500 to Pratik",
+   "turns": [
+    {
+     "msg": "give discount 500 to Pratik",
+     "expect_intent": "RENT_DISCOUNT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-069",
+   "intent": "RENT_DISCOUNT",
+   "phone": "917358341775",
+   "desc": "finance block: give discount 500 to Pratik",
+   "turns": [
+    {
+     "msg": "give discount 500 to Pratik",
+     "expect_intent": "RENT_DISCOUNT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-070",
+   "intent": "RENT_DISCOUNT",
+   "phone": "919444296681",
+   "desc": "finance block: give discount 500 to Pratik",
+   "turns": [
+    {
+     "msg": "give discount 500 to Pratik",
+     "expect_intent": "RENT_DISCOUNT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-071",
+   "intent": "RENT_DISCOUNT",
+   "phone": "917680814628",
+   "desc": "finance block: give discount 500 to Pratik",
+   "turns": [
+    {
+     "msg": "give discount 500 to Pratik",
+     "expect_intent": "RENT_DISCOUNT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-072",
+   "intent": "RENT_DISCOUNT",
+   "phone": "917358341775",
+   "desc": "finance block: discount of 1000 for room 609",
+   "turns": [
+    {
+     "msg": "discount of 1000 for room 609",
+     "expect_intent": "RENT_DISCOUNT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-073",
+   "intent": "RENT_DISCOUNT",
+   "phone": "919444296681",
+   "desc": "finance block: rent concession 500 Madhuri",
+   "turns": [
+    {
+     "msg": "rent concession 500 Madhuri",
+     "expect_intent": "RENT_DISCOUNT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-074",
+   "intent": "VOID_PAYMENT",
+   "phone": "917845952289",
+   "desc": "finance block: void payment of Pratik",
+   "turns": [
+    {
+     "msg": "void payment of Pratik",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-075",
+   "intent": "VOID_PAYMENT",
+   "phone": "917358341775",
+   "desc": "finance block: void payment of Pratik",
+   "turns": [
+    {
+     "msg": "void payment of Pratik",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-076",
+   "intent": "VOID_PAYMENT",
+   "phone": "919444296681",
+   "desc": "finance block: void payment of Pratik",
+   "turns": [
+    {
+     "msg": "void payment of Pratik",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-077",
+   "intent": "VOID_PAYMENT",
+   "phone": "917680814628",
+   "desc": "finance block: void payment of Pratik",
+   "turns": [
+    {
+     "msg": "void payment of Pratik",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-078",
+   "intent": "VOID_PAYMENT",
+   "phone": "917358341775",
+   "desc": "finance block: cancel the 5000 payment of room 609",
+   "turns": [
+    {
+     "msg": "cancel the 5000 payment of room 609",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-079",
+   "intent": "VOID_PAYMENT",
+   "phone": "919444296681",
+   "desc": "finance block: delete payment Madhuri",
+   "turns": [
+    {
+     "msg": "delete payment Madhuri",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-080",
+   "intent": "VOID_PAYMENT",
+   "phone": "917680814628",
+   "desc": "finance block: reverse last payment",
+   "turns": [
+    {
+     "msg": "reverse last payment",
+     "expect_intent": "VOID_PAYMENT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-081",
+   "intent": "VOID_EXPENSE",
+   "phone": "917845952289",
+   "desc": "finance block: void expense 1500 plumber",
+   "turns": [
+    {
+     "msg": "void expense 1500 plumber",
+     "expect_intent": "VOID_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-082",
+   "intent": "VOID_EXPENSE",
+   "phone": "917358341775",
+   "desc": "finance block: void expense 1500 plumber",
+   "turns": [
+    {
+     "msg": "void expense 1500 plumber",
+     "expect_intent": "VOID_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-083",
+   "intent": "VOID_EXPENSE",
+   "phone": "919444296681",
+   "desc": "finance block: void expense 1500 plumber",
+   "turns": [
+    {
+     "msg": "void expense 1500 plumber",
+     "expect_intent": "VOID_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-084",
+   "intent": "VOID_EXPENSE",
+   "phone": "917680814628",
+   "desc": "finance block: void expense 1500 plumber",
+   "turns": [
+    {
+     "msg": "void expense 1500 plumber",
+     "expect_intent": "VOID_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-085",
+   "intent": "VOID_EXPENSE",
+   "phone": "917358341775",
+   "desc": "finance block: cancel expense electricity",
+   "turns": [
+    {
+     "msg": "cancel expense electricity",
+     "expect_intent": "VOID_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-086",
+   "intent": "VOID_EXPENSE",
+   "phone": "919444296681",
+   "desc": "finance block: delete last expense",
+   "turns": [
+    {
+     "msg": "delete last expense",
+     "expect_intent": "VOID_EXPENSE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-087",
+   "intent": "DEPOSIT_CHANGE",
+   "phone": "917845952289",
+   "desc": "finance block: change deposit of Pratik to 20000",
+   "turns": [
+    {
+     "msg": "change deposit of Pratik to 20000",
+     "expect_intent": "DEPOSIT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-088",
+   "intent": "DEPOSIT_CHANGE",
+   "phone": "917358341775",
+   "desc": "finance block: change deposit of Pratik to 20000",
+   "turns": [
+    {
+     "msg": "change deposit of Pratik to 20000",
+     "expect_intent": "DEPOSIT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-089",
+   "intent": "DEPOSIT_CHANGE",
+   "phone": "919444296681",
+   "desc": "finance block: change deposit of Pratik to 20000",
+   "turns": [
+    {
+     "msg": "change deposit of Pratik to 20000",
+     "expect_intent": "DEPOSIT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-090",
+   "intent": "DEPOSIT_CHANGE",
+   "phone": "917680814628",
+   "desc": "finance block: change deposit of Pratik to 20000",
+   "turns": [
+    {
+     "msg": "change deposit of Pratik to 20000",
+     "expect_intent": "DEPOSIT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-091",
+   "intent": "DEPOSIT_CHANGE",
+   "phone": "917358341775",
+   "desc": "finance block: deposit update room 609 15000",
+   "turns": [
+    {
+     "msg": "deposit update room 609 15000",
+     "expect_intent": "DEPOSIT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-092",
+   "intent": "DEPOSIT_CHANGE",
+   "phone": "919444296681",
+   "desc": "finance block: security deposit for Madhuri is 10000",
+   "turns": [
+    {
+     "msg": "security deposit for Madhuri is 10000",
+     "expect_intent": "DEPOSIT_CHANGE",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-093",
+   "intent": "ADD_REFUND",
+   "phone": "917845952289",
+   "desc": "finance block: refund 5000 to Pratik",
+   "turns": [
+    {
+     "msg": "refund 5000 to Pratik",
+     "expect_intent": "ADD_REFUND",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-094",
+   "intent": "ADD_REFUND",
+   "phone": "917358341775",
+   "desc": "finance block: refund 5000 to Pratik",
+   "turns": [
+    {
+     "msg": "refund 5000 to Pratik",
+     "expect_intent": "ADD_REFUND",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-095",
+   "intent": "ADD_REFUND",
+   "phone": "919444296681",
+   "desc": "finance block: refund 5000 to Pratik",
+   "turns": [
+    {
+     "msg": "refund 5000 to Pratik",
+     "expect_intent": "ADD_REFUND",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-096",
+   "intent": "ADD_REFUND",
+   "phone": "917680814628",
+   "desc": "finance block: refund 5000 to Pratik",
+   "turns": [
+    {
+     "msg": "refund 5000 to Pratik",
+     "expect_intent": "ADD_REFUND",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-097",
+   "intent": "ADD_REFUND",
+   "phone": "917358341775",
+   "desc": "finance block: refunded 3000 to room 609",
+   "turns": [
+    {
+     "msg": "refunded 3000 to room 609",
+     "expect_intent": "ADD_REFUND",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-098",
+   "intent": "ADD_REFUND",
+   "phone": "919444296681",
+   "desc": "finance block: refund deposit 8000 to Varun",
+   "turns": [
+    {
+     "msg": "refund deposit 8000 to Varun",
+     "expect_intent": "ADD_REFUND",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-099",
+   "intent": "QUERY_REFUNDS",
+   "phone": "917845952289",
+   "desc": "finance block: show refunds",
+   "turns": [
+    {
+     "msg": "show refunds",
+     "expect_intent": "QUERY_REFUNDS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-100",
+   "intent": "QUERY_REFUNDS",
+   "phone": "917358341775",
+   "desc": "finance block: show refunds",
+   "turns": [
+    {
+     "msg": "show refunds",
+     "expect_intent": "QUERY_REFUNDS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-101",
+   "intent": "QUERY_REFUNDS",
+   "phone": "919444296681",
+   "desc": "finance block: show refunds",
+   "turns": [
+    {
+     "msg": "show refunds",
+     "expect_intent": "QUERY_REFUNDS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-102",
+   "intent": "QUERY_REFUNDS",
+   "phone": "917680814628",
+   "desc": "finance block: show refunds",
+   "turns": [
+    {
+     "msg": "show refunds",
+     "expect_intent": "QUERY_REFUNDS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-103",
+   "intent": "QUERY_REFUNDS",
+   "phone": "917358341775",
+   "desc": "finance block: refunds this month",
+   "turns": [
+    {
+     "msg": "refunds this month",
+     "expect_intent": "QUERY_REFUNDS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-104",
+   "intent": "QUERY_REFUNDS",
+   "phone": "919444296681",
+   "desc": "finance block: list of deposit refunds",
+   "turns": [
+    {
+     "msg": "list of deposit refunds",
+     "expect_intent": "QUERY_REFUNDS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-105",
+   "intent": "BANK_REPORT",
+   "phone": "917845952289",
+   "desc": "finance block: bank report",
+   "turns": [
+    {
+     "msg": "bank report",
+     "expect_intent": "BANK_REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-106",
+   "intent": "BANK_REPORT",
+   "phone": "917358341775",
+   "desc": "finance block: bank report",
+   "turns": [
+    {
+     "msg": "bank report",
+     "expect_intent": "BANK_REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-107",
+   "intent": "BANK_REPORT",
+   "phone": "919444296681",
+   "desc": "finance block: bank report",
+   "turns": [
+    {
+     "msg": "bank report",
+     "expect_intent": "BANK_REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-108",
+   "intent": "BANK_REPORT",
+   "phone": "917680814628",
+   "desc": "finance block: bank report",
+   "turns": [
+    {
+     "msg": "bank report",
+     "expect_intent": "BANK_REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-109",
+   "intent": "BANK_REPORT",
+   "phone": "917358341775",
+   "desc": "finance block: bank statement summary",
+   "turns": [
+    {
+     "msg": "bank statement summary",
+     "expect_intent": "BANK_REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-110",
+   "intent": "BANK_REPORT",
+   "phone": "919444296681",
+   "desc": "finance block: bank report march",
+   "turns": [
+    {
+     "msg": "bank report march",
+     "expect_intent": "BANK_REPORT",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-111",
+   "intent": "BANK_DEPOSIT_MATCH",
+   "phone": "917845952289",
+   "desc": "finance block: match deposits",
+   "turns": [
+    {
+     "msg": "match deposits",
+     "expect_intent": "BANK_DEPOSIT_MATCH",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-112",
+   "intent": "BANK_DEPOSIT_MATCH",
+   "phone": "917358341775",
+   "desc": "finance block: match deposits",
+   "turns": [
+    {
+     "msg": "match deposits",
+     "expect_intent": "BANK_DEPOSIT_MATCH",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-113",
+   "intent": "BANK_DEPOSIT_MATCH",
+   "phone": "919444296681",
+   "desc": "finance block: match deposits",
+   "turns": [
+    {
+     "msg": "match deposits",
+     "expect_intent": "BANK_DEPOSIT_MATCH",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-114",
+   "intent": "BANK_DEPOSIT_MATCH",
+   "phone": "917680814628",
+   "desc": "finance block: match deposits",
+   "turns": [
+    {
+     "msg": "match deposits",
+     "expect_intent": "BANK_DEPOSIT_MATCH",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-115",
+   "intent": "BANK_DEPOSIT_MATCH",
+   "phone": "917358341775",
+   "desc": "finance block: reconcile bank deposits",
+   "turns": [
+    {
+     "msg": "reconcile bank deposits",
+     "expect_intent": "BANK_DEPOSIT_MATCH",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-116",
+   "intent": "BANK_DEPOSIT_MATCH",
+   "phone": "919444296681",
+   "desc": "finance block: match bank deposits with tenants",
+   "turns": [
+    {
+     "msg": "match bank deposits with tenants",
+     "expect_intent": "BANK_DEPOSIT_MATCH",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-117",
+   "intent": "DASHBOARD_SUMMARY",
+   "phone": "917845952289",
+   "desc": "finance block: dashboard",
+   "turns": [
+    {
+     "msg": "dashboard",
+     "expect_intent": "DASHBOARD_SUMMARY",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-118",
+   "intent": "DASHBOARD_SUMMARY",
+   "phone": "917358341775",
+   "desc": "finance block: dashboard",
+   "turns": [
+    {
+     "msg": "dashboard",
+     "expect_intent": "DASHBOARD_SUMMARY",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-119",
+   "intent": "DASHBOARD_SUMMARY",
+   "phone": "919444296681",
+   "desc": "finance block: dashboard",
+   "turns": [
+    {
+     "msg": "dashboard",
+     "expect_intent": "DASHBOARD_SUMMARY",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-120",
+   "intent": "DASHBOARD_SUMMARY",
+   "phone": "917680814628",
+   "desc": "finance block: dashboard",
+   "turns": [
+    {
+     "msg": "dashboard",
+     "expect_intent": "DASHBOARD_SUMMARY",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-121",
+   "intent": "DASHBOARD_SUMMARY",
+   "phone": "917358341775",
+   "desc": "finance block: show dashboard summary",
+   "turns": [
+    {
+     "msg": "show dashboard summary",
+     "expect_intent": "DASHBOARD_SUMMARY",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-122",
+   "intent": "DASHBOARD_SUMMARY",
+   "phone": "919444296681",
+   "desc": "finance block: dashboard please",
+   "turns": [
+    {
+     "msg": "dashboard please",
+     "expect_intent": "DASHBOARD_SUMMARY",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-123",
+   "intent": "QUERY_UNIT_ECONOMICS",
+   "phone": "917845952289",
+   "desc": "finance block: unit economics",
+   "turns": [
+    {
+     "msg": "unit economics",
+     "expect_intent": "QUERY_UNIT_ECONOMICS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-124",
+   "intent": "QUERY_UNIT_ECONOMICS",
+   "phone": "917358341775",
+   "desc": "finance block: unit economics",
+   "turns": [
+    {
+     "msg": "unit economics",
+     "expect_intent": "QUERY_UNIT_ECONOMICS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-125",
+   "intent": "QUERY_UNIT_ECONOMICS",
+   "phone": "919444296681",
+   "desc": "finance block: unit economics",
+   "turns": [
+    {
+     "msg": "unit economics",
+     "expect_intent": "QUERY_UNIT_ECONOMICS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-126",
+   "intent": "QUERY_UNIT_ECONOMICS",
+   "phone": "917680814628",
+   "desc": "finance block: unit economics",
+   "turns": [
+    {
+     "msg": "unit economics",
+     "expect_intent": "QUERY_UNIT_ECONOMICS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-127",
+   "intent": "QUERY_UNIT_ECONOMICS",
+   "phone": "917358341775",
+   "desc": "finance block: revenue per bed",
+   "turns": [
+    {
+     "msg": "revenue per bed",
+     "expect_intent": "QUERY_UNIT_ECONOMICS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  },
+  {
+   "id": "G-128",
+   "intent": "QUERY_UNIT_ECONOMICS",
+   "phone": "919444296681",
+   "desc": "finance block: ebitda per bed",
+   "turns": [
+    {
+     "msg": "ebitda per bed",
+     "expect_intent": "QUERY_UNIT_ECONOMICS",
+     "expect_contains": [
+      "Kozzy app",
+      "not available via WhatsApp"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from payments where created_at > now() - interval '3 minutes' and notes ilike '%whatsapp%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select count(*) from expenses where created_at > now() - interval '3 minutes'",
+     "expect": "zero"
+    }
+   ]
+  }
+ ]
+}

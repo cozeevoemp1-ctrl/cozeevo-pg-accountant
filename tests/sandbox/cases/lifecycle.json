@@ -1,0 +1,2574 @@
+{
+  "area": "lifecycle",
+  "cases": [
+    {
+      "id": "L-001",
+      "intent": "ADD_TENANT",
+      "desc": "bare add tenant -> points to working start-onboarding path, not dead PWA URL",
+      "turns": [
+        {
+          "msg": "add tenant",
+          "expect_intent": "ADD_TENANT",
+          "expect_contains": [
+            "start onboarding"
+          ],
+          "expect_not_contains": [
+            "getkozzy.com/onboarding"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-002",
+      "intent": "ADD_TENANT",
+      "desc": "casual",
+      "turns": [
+        {
+          "msg": "new tenant joining",
+          "expect_intent": "ADD_TENANT",
+          "expect_contains": [
+            "start onboarding"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-003",
+      "intent": "ADD_TENANT",
+      "desc": "hinglish",
+      "turns": [
+        {
+          "msg": "naya tenant add karo",
+          "expect_intent": "ADD_TENANT",
+          "expect_contains": [
+            "start onboarding"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-004",
+      "intent": "ADD_TENANT",
+      "desc": "short form with room",
+      "turns": [
+        {
+          "msg": "new admission room 213",
+          "expect_intent": "ADD_TENANT",
+          "expect_contains": [
+            "start onboarding"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-005",
+      "intent": "ADD_TENANT",
+      "desc": "receptionist, register tenant",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "register tenant",
+          "expect_intent": "ADD_TENANT",
+          "expect_contains": [
+            "start onboarding"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-006",
+      "intent": "ADD_TENANT",
+      "desc": "typo + name + phone -> goes straight into onboarding flow, then cancel",
+      "turns": [
+        {
+          "msg": "add tenent Ravi Kumar 9876500011",
+          "expect_intent": "ADD_TENANT",
+          "expect_contains": [
+            "Ravi Kumar",
+            "room",
+            "rent",
+            "deposit"
+          ]
+        },
+        {
+          "msg": "cancel",
+          "expect_any": [
+            "cancel"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from onboarding_sessions where tenant_phone like '%9876500011' and status='pending_tenant'",
+          "expect": "0"
+        },
+        {
+          "sql": "select count(*) from tenants where phone like '%9876500011'",
+          "expect": "0"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-007",
+      "intent": "ADD_TENANT",
+      "desc": "blocked phone gets silence",
+      "phone": "919999900001",
+      "turns": [
+        {
+          "msg": "add tenant",
+          "expect_silent": true
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-010",
+      "intent": "START_ONBOARDING",
+      "desc": "full flow labelled reply -> staff gets /join link, tenant gets nothing, no orphan tenant row",
+      "turns": [
+        {
+          "msg": "start onboarding Arjun Rao 9876500101",
+          "expect_intent": "START_ONBOARDING",
+          "expect_contains": [
+            "Arjun Rao",
+            "room",
+            "rent",
+            "deposit"
+          ],
+          "expect_not_contains": [
+            "WhatsApp this number"
+          ]
+        },
+        {
+          "msg": "room 223 rent 14000 deposit 14000 checkin 20 oct",
+          "expect_contains": [
+            "Arjun Rao",
+            "223",
+            "14,000",
+            "20 Oct 2026"
+          ],
+          "expect_any": [
+            "yes"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "/join/",
+            "forward"
+          ],
+          "expect_not_contains": [
+            "WhatsApp this number",
+            "getkozzy.com/onboarding"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from onboarding_sessions where tenant_phone like '%9876500101' and status='pending_tenant'",
+          "expect": "1"
+        },
+        {
+          "sql": "select agreed_rent::int||'/'||security_deposit::int||'/'||checkin_date from onboarding_sessions where tenant_phone like '%9876500101' and status='pending_tenant'",
+          "expect": "14000/14000/2026-10-20"
+        },
+        {
+          "sql": "select count(*) from tenants where phone like '%9876500101'",
+          "expect": "0"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-011",
+      "intent": "START_ONBOARDING",
+      "desc": "positional reply",
+      "turns": [
+        {
+          "msg": "start kyc for Sameer Khan 9876500103",
+          "expect_intent": "START_ONBOARDING",
+          "expect_contains": [
+            "Sameer Khan",
+            "room"
+          ]
+        },
+        {
+          "msg": "223 13000 15000 25/10/2026",
+          "expect_contains": [
+            "223",
+            "13,000",
+            "15,000",
+            "25 Oct 2026"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "/join/"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select agreed_rent::int||'/'||security_deposit::int||'/'||checkin_date from onboarding_sessions where tenant_phone like '%9876500103' and status='pending_tenant'",
+          "expect": "13000/15000/2026-10-25"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-012",
+      "intent": "START_ONBOARDING",
+      "desc": "everything in one message, then No at confirm",
+      "turns": [
+        {
+          "msg": "start onboarding Kavitha Nair 9876500104 room 223 rent 13000 deposit 13000 checkin 22 oct",
+          "expect_intent": "START_ONBOARDING",
+          "expect_contains": [
+            "Kavitha Nair",
+            "223",
+            "13,000",
+            "22 Oct 2026"
+          ]
+        },
+        {
+          "msg": "no",
+          "expect_any": [
+            "cancel"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from onboarding_sessions where tenant_phone like '%9876500104' and status='pending_tenant'",
+          "expect": "0"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-013",
+      "intent": "START_ONBOARDING",
+      "desc": "invalid room then valid",
+      "turns": [
+        {
+          "msg": "onboard Meera Joshi 9876500102",
+          "expect_intent": "START_ONBOARDING",
+          "expect_contains": [
+            "Meera Joshi"
+          ]
+        },
+        {
+          "msg": "room 999 rent 12000 deposit 12000 checkin 21 oct",
+          "expect_contains": [
+            "999"
+          ],
+          "expect_any": [
+            "not found",
+            "does not exist"
+          ]
+        },
+        {
+          "msg": "room 223 rent 12000 deposit 12000 checkin 21 oct",
+          "expect_contains": [
+            "223",
+            "12,000"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "/join/"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from onboarding_sessions where tenant_phone like '%9876500102' and status='pending_tenant'",
+          "expect": "1"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-014",
+      "intent": "START_ONBOARDING",
+      "desc": "deposit missing -> asked for (never defaulted), then supplied",
+      "turns": [
+        {
+          "msg": "begin onboarding for Kavya Rao 9876500105",
+          "expect_intent": "START_ONBOARDING"
+        },
+        {
+          "msg": "room 223 rent 12500 checkin 23 oct",
+          "expect_contains": [
+            "deposit"
+          ],
+          "expect_not_contains": [
+            "/join/"
+          ]
+        },
+        {
+          "msg": "deposit 12500",
+          "expect_contains": [
+            "12,500",
+            "23 Oct 2026"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "/join/"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select security_deposit::int from onboarding_sessions where tenant_phone like '%9876500105' and status='pending_tenant'",
+          "expect": "12500"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-015",
+      "intent": "START_ONBOARDING",
+      "desc": "correction at confirm step",
+      "turns": [
+        {
+          "msg": "registration for Imran Sheikh 9876500106",
+          "expect_intent": "START_ONBOARDING"
+        },
+        {
+          "msg": "room 223 rent 12000 deposit 12000 checkin 24 oct",
+          "expect_contains": [
+            "12,000"
+          ]
+        },
+        {
+          "msg": "rent 13500",
+          "expect_contains": [
+            "13,500",
+            "24 Oct 2026"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "/join/"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select agreed_rent::int from onboarding_sessions where tenant_phone like '%9876500106' and status='pending_tenant'",
+          "expect": "13500"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-016",
+      "intent": "START_ONBOARDING",
+      "desc": "phone of an active resident is rejected",
+      "turns": [
+        {
+          "msg": "start onboarding Hemant Desai 9000000192",
+          "expect_intent": "START_ONBOARDING"
+        },
+        {
+          "msg": "room 223 rent 12000 deposit 12000 checkin 25 oct",
+          "expect_contains": [
+            "Confirm booking"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "104"
+          ],
+          "expect_not_contains": [
+            "/join/"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from onboarding_sessions where tenant_phone like '%9000000192' and status='pending_tenant'",
+          "expect": "0"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-017",
+      "intent": "START_ONBOARDING",
+      "desc": "no phone -> asks for name and phone",
+      "turns": [
+        {
+          "msg": "start onboarding",
+          "expect_intent": "START_ONBOARDING",
+          "expect_contains": [
+            "phone"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-018",
+      "intent": "START_ONBOARDING",
+      "desc": "receptionist full flow",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "onboarding for Deepa Menon 9876500107",
+          "expect_intent": "START_ONBOARDING",
+          "expect_contains": [
+            "Deepa Menon"
+          ]
+        },
+        {
+          "msg": "room 223 rent 12000 deposit 15000 checkin 26 oct"
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "/join/"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from onboarding_sessions where tenant_phone like '%9876500107' and status='pending_tenant'",
+          "expect": "1"
+        },
+        {
+          "sql": "select count(*) from tenants where phone like '%9876500107'",
+          "expect": "0"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-020",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "X arrived -> due at door, cancel",
+      "turns": [
+        {
+          "msg": "Rohan Yogi arrived",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi",
+            "Due at door"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000000583' order by x.id desc limit 1)",
+          "expect": "no_show"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-021",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "mark as arrived",
+      "turns": [
+        {
+          "msg": "mark Rohan Yogi as arrived",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi",
+            "Due at door"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-022",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "is here",
+      "turns": [
+        {
+          "msg": "Rohan Yogi is here",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi",
+            "Due at door"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-023",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "confirm arrival",
+      "turns": [
+        {
+          "msg": "confirm arrival Rohan Yogi",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-024",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "check in X",
+      "turns": [
+        {
+          "msg": "check in Rohan Yogi",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-025",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "by room number",
+      "turns": [
+        {
+          "msg": "room 201 arrived",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-026",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "has arrived today, receptionist",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "Rohan Yogi has arrived today",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "Rohan Yogi"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-027",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "room full -> refuses at confirm, stays no_show",
+      "turns": [
+        {
+          "msg": "Rohan Yogi arrived",
+          "expect_contains": [
+            "Due at door"
+          ]
+        },
+        {
+          "msg": "skip",
+          "expect_contains": [
+            "Confirm check-in"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_any": [
+            "Cannot check in",
+            "full"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000000583' order by x.id desc limit 1)",
+          "expect": "no_show"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-028",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "full flow with cash at door -> active, booking RS row activated, audit, no tenant message",
+      "turns": [
+        {
+          "msg": "Arnav Kulkarni arrived",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_any": [
+            "Due at door",
+            "No no-show booking"
+          ],
+          "end_if_contains": [
+            "No no-show booking"
+          ]
+        },
+        {
+          "msg": "10000 cash",
+          "expect_contains": [
+            "Confirm check-in"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "checked in"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009001' order by x.id desc limit 1)",
+          "expect": "active"
+        },
+        {
+          "sql": "select status||'/'||(rent_due>0) from rent_schedule where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009001' order by x.id desc limit 1) and period_month='2026-10-01'",
+          "expect": "pending/true"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009001' order by x.id desc limit 1) and field='status' and new_value='active' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        },
+        {
+          "sql": "select count(*) from payments where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009001' order by x.id desc limit 1) and amount=10000 and not is_void",
+          "expect": "1"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-029",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "skip payment flow -> active, RS activated",
+      "turns": [
+        {
+          "msg": "Bhoomi Iyer arrived",
+          "expect_any": [
+            "Due at door",
+            "No no-show booking"
+          ],
+          "end_if_contains": [
+            "No no-show booking"
+          ]
+        },
+        {
+          "msg": "skip"
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "checked in"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009002' order by x.id desc limit 1)",
+          "expect": "active"
+        },
+        {
+          "sql": "select status::text from rent_schedule where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009002' order by x.id desc limit 1) and period_month='2026-10-01'",
+          "expect": "pending"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-030",
+      "intent": "CHECKIN_ARRIVAL",
+      "desc": "not found",
+      "turns": [
+        {
+          "msg": "Zzyzx Qwerty arrived",
+          "expect_intent": "CHECKIN_ARRIVAL",
+          "expect_contains": [
+            "No no-show booking"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-040",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "checked in on -> confirm -> date changed + audit",
+      "turns": [
+        {
+          "msg": "Varun Reddy checked in on 18 April",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Update checkin for *Varun Reddy*",
+            "18 Apr 2026"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Checkin updated",
+            "18 Apr 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select checkin_date from tenancies where id=3",
+          "expect": "2026-04-18"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=3 and field='checkin_date' and new_value='2026-04-18' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-041",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "update checkin back to original",
+      "turns": [
+        {
+          "msg": "update checkin Varun Reddy 19 April",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Update checkin for *Varun Reddy*",
+            "19 Apr 2026"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Checkin updated"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select checkin_date from tenancies where id=3",
+          "expect": "2026-04-19"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-042",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "change checkin date for X to D, then cancel",
+      "turns": [
+        {
+          "msg": "change checkin date for Varun Reddy to 16 Apr",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Varun Reddy",
+            "16 Apr"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select checkin_date from tenancies where id=3",
+          "expect": "2026-04-19"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-043",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "joined on",
+      "turns": [
+        {
+          "msg": "Varun Reddy joined on 17 April",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Varun Reddy"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-044",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "numeric date",
+      "turns": [
+        {
+          "msg": "correct check-in Varun Reddy 18/04/2026",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Varun Reddy",
+            "18 Apr 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-045",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "checkin date for X is D",
+      "turns": [
+        {
+          "msg": "checkin date for Varun Reddy is 15 April",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Varun Reddy"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-046",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "future date rejected",
+      "turns": [
+        {
+          "msg": "Varun Reddy checked in on 25 December",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "future"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-047",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "not found",
+      "turns": [
+        {
+          "msg": "Zzyzx Qwerty checked in on 5 April",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_any": [
+            "no ",
+            "not found",
+            "couldn"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-048",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "current-month checkin change recalcs first-month rent row",
+      "turns": [
+        {
+          "msg": "Bhoomi Iyer checked in on 8 Oct",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Update checkin for *Bhoomi Iyer*"
+          ],
+          "expect_not_contains": [
+            "Bhoomi Pandey"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Checkin updated",
+            "08 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select checkin_date from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009002' order by x.id desc limit 1)",
+          "expect": "2026-10-08"
+        },
+        {
+          "sql": "select rent_due::int from rent_schedule where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009002' order by x.id desc limit 1) and period_month='2026-10-01'",
+          "expect": "21290"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-049",
+      "intent": "UPDATE_CHECKIN",
+      "desc": "move it back -> recalculated again",
+      "turns": [
+        {
+          "msg": "Bhoomi Iyer checked in on 10 Oct",
+          "expect_intent": "UPDATE_CHECKIN",
+          "expect_contains": [
+            "Update checkin for *Bhoomi Iyer*"
+          ],
+          "expect_not_contains": [
+            "Bhoomi Pandey"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Checkin updated"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select rent_due::int from rent_schedule where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009002' order by x.id desc limit 1) and period_month='2026-10-01'",
+          "expect": "20516"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-060",
+      "intent": "CHECKOUT",
+      "desc": "full checkout -> checklist -> exited + audit + checkout record, no tenant message",
+      "turns": [
+        {
+          "msg": "checkout Zorawar Bedi",
+          "expect_any": [
+            "Confirm checkout for *Zorawar Bedi*",
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "end_if_contains": [
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "expect_intent": "CHECKOUT"
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Q1/5",
+            "Exit date: 11 Oct 2026"
+          ]
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "no"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "0",
+          "expect_contains": [
+            "confirm"
+          ]
+        },
+        {
+          "msg": "confirm",
+          "expect_contains": [
+            "Checkout Complete"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status||' '||(checkout_date = '2026-10-11' or checkout_date = '2026-10-10') from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009011' order by x.id desc limit 1)",
+          "expect": "exited true",
+          "note": "10 Oct on repeat runs: L-105 corrects it"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009011' order by x.id desc limit 1) and field='status+checkout_date' and new_value like 'exited%' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        },
+        {
+          "sql": "select count(*) from checkout_records where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009011' order by x.id desc limit 1)",
+          "expect": "1"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-061",
+      "intent": "CHECKOUT",
+      "desc": "past date checkout keeps the given exit date",
+      "turns": [
+        {
+          "msg": "checkout Quincy Dsouza on 5 Oct",
+          "expect_any": [
+            "Confirm checkout for *Quincy Dsouza*",
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "end_if_contains": [
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "expect_intent": [
+            "CHECKOUT",
+            "SCHEDULE_CHECKOUT"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Exit date: 05 Oct 2026"
+          ]
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "no"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "0"
+        },
+        {
+          "msg": "confirm",
+          "expect_contains": [
+            "Checkout Complete",
+            "05 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status||' '||checkout_date from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009012' order by x.id desc limit 1)",
+          "expect": "exited 2026-10-05"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-062",
+      "intent": "CHECKOUT",
+      "desc": "day-stay checkout",
+      "turns": [
+        {
+          "msg": "checkout Ujjwal Rana",
+          "expect_any": [
+            "Confirm checkout for *Ujjwal Rana*",
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "end_if_contains": [
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "expect_intent": "CHECKOUT"
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Checkout recorded"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009013' order by x.id desc limit 1)",
+          "expect": "exited"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009013' order by x.id desc limit 1) and field='status+checkout_date' and new_value like 'exited%' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-063",
+      "intent": "CHECKOUT",
+      "desc": "is leaving",
+      "turns": [
+        {
+          "msg": "Rohan Chandra is leaving",
+          "expect_intent": "CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra",
+            "Reply *1*"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-064",
+      "intent": "CHECKOUT",
+      "desc": "checkout room N (bot's own suggested syntax)",
+      "turns": [
+        {
+          "msg": "checkout room 110",
+          "expect_intent": "CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra",
+            "Reply *1*"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-065",
+      "intent": "CHECKOUT",
+      "desc": "vacate X",
+      "turns": [
+        {
+          "msg": "vacate Rohan Chandra",
+          "expect_intent": "CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-066",
+      "intent": "CHECKOUT",
+      "desc": "moving out",
+      "turns": [
+        {
+          "msg": "Rohan Chandra moving out",
+          "expect_intent": "CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-067",
+      "intent": "CHECKOUT",
+      "desc": "hinglish",
+      "turns": [
+        {
+          "msg": "Rohan Chandra ja raha hai",
+          "expect_intent": "CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-068",
+      "intent": "CHECKOUT",
+      "desc": "cancel mid-checklist leaves tenant active",
+      "turns": [
+        {
+          "msg": "checkout Rohan Chandra",
+          "expect_contains": [
+            "Confirm checkout for *Rohan Chandra*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Q1/5"
+          ]
+        },
+        {
+          "msg": "yes",
+          "expect_contains": [
+            "Q2/5"
+          ]
+        },
+        {
+          "msg": "cancel",
+          "expect_any": [
+            "cancel"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=43",
+          "expect": "active"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-069",
+      "intent": "CHECKOUT",
+      "desc": "not found",
+      "turns": [
+        {
+          "msg": "checkout Zzyzx Qwerty",
+          "expect_intent": "CHECKOUT",
+          "expect_any": [
+            "no ",
+            "not found",
+            "couldn"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-070",
+      "intent": "CHECKOUT",
+      "desc": "ambiguous first name -> numbered choices",
+      "turns": [
+        {
+          "msg": "checkout Hemant",
+          "expect_intent": "CHECKOUT",
+          "expect_contains": [
+            "Hemant Desai",
+            "Hemant Yogi"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-071",
+      "intent": "CHECKOUT",
+      "desc": "receptionist full checkout with deduction + reason",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "checkout Yohan Tamboli",
+          "expect_any": [
+            "Confirm checkout for *Yohan Tamboli*",
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "end_if_contains": [
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "Q1/5"
+          ]
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "no"
+        },
+        {
+          "msg": "broken chair"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "2000"
+        },
+        {
+          "msg": "chair damage"
+        },
+        {
+          "msg": "confirm",
+          "expect_contains": [
+            "Checkout Complete"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009015' order by x.id desc limit 1)",
+          "expect": "exited"
+        },
+        {
+          "sql": "select deductions::int||' '||coalesce(damage_notes,'') from checkout_records where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009015' order by x.id desc limit 1)",
+          "expect": "2000 broken chair"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009015' order by x.id desc limit 1) and field='status+checkout_date' and new_value like 'exited%' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-072",
+      "intent": "CHECKOUT",
+      "desc": "late-notice tenant: deposit stays refundable (rule 0b), never 'forfeited'",
+      "turns": [
+        {
+          "msg": "checkout Falguni Chandra",
+          "expect_contains": [
+            "Confirm checkout for *Falguni Chandra*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_not_contains": [
+            "forfeited"
+          ],
+          "expect_contains": [
+            "refund",
+            "Q1/5"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-080",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "record checkout full flow with exit date",
+      "turns": [
+        {
+          "msg": "record checkout Xerxes Irani",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_any": [
+            "Checkout Form — Xerxes Irani",
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ],
+          "end_if_contains": [
+            "No active tenant",
+            "not found",
+            "No tenant",
+            "couldn't find",
+            "no match"
+          ]
+        },
+        {
+          "msg": "today",
+          "expect_contains": [
+            "Q1/5"
+          ]
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "no"
+        },
+        {
+          "msg": "yes"
+        },
+        {
+          "msg": "0"
+        },
+        {
+          "msg": "confirm",
+          "expect_contains": [
+            "Checkout Complete"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status||' '||checkout_date from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009014' order by x.id desc limit 1)",
+          "expect": "exited 2026-10-11"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009014' order by x.id desc limit 1) and field='status+checkout_date' and new_value like 'exited%' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        },
+        {
+          "sql": "select count(*) from checkout_records where tenancy_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009014' order by x.id desc limit 1)",
+          "expect": "1"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-081",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "checkout form X",
+      "turns": [
+        {
+          "msg": "checkout form Rohan Chandra",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra",
+            "Exit date"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-082",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "offboard",
+      "turns": [
+        {
+          "msg": "offboard Rohan Chandra",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_contains": [
+            "Exit date"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-083",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "process checkout for",
+      "turns": [
+        {
+          "msg": "process checkout for Rohan Chandra",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_contains": [
+            "Exit date"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-084",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "keys returned",
+      "turns": [
+        {
+          "msg": "keys returned Rohan Chandra",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra",
+            "Exit date"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-085",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "hinglish ka checkout",
+      "turns": [
+        {
+          "msg": "Rohan ka checkout",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_contains": [
+            "Rohan Chandra"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-086",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "invalid exit date then cancel",
+      "turns": [
+        {
+          "msg": "record checkout Rohan Chandra",
+          "expect_contains": [
+            "Exit date"
+          ]
+        },
+        {
+          "msg": "blah",
+          "expect_contains": [
+            "Couldn't parse"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status from tenancies where id=43",
+          "expect": "active"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-087",
+      "intent": "RECORD_CHECKOUT",
+      "desc": "no name",
+      "turns": [
+        {
+          "msg": "record checkout",
+          "expect_intent": "RECORD_CHECKOUT",
+          "expect_contains": [
+            "name"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-090",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "leaving on future date -> confirm -> expected_checkout set, stays active, audit",
+      "turns": [
+        {
+          "msg": "Shreya Xalxo leaving on 30 November",
+          "expect_intent": "SCHEDULE_CHECKOUT",
+          "expect_contains": [
+            "Confirm checkout for *Shreya Xalxo*",
+            "30 Nov 2026"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "scheduled",
+            "30 Nov 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status||' '||expected_checkout||' '||coalesce(checkout_date::text,'-') from tenancies where id=103",
+          "expect": "active 2026-11-30 -"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=103 and field='expected_checkout' and new_value='2026-11-30' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-091",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "schedule checkout X D",
+      "turns": [
+        {
+          "msg": "schedule checkout Shreya Xalxo 28 November",
+          "expect_intent": "SCHEDULE_CHECKOUT",
+          "expect_contains": [
+            "Shreya Xalxo",
+            "28 Nov 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-092",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "plan checkout",
+      "turns": [
+        {
+          "msg": "plan checkout Shreya Xalxo 27 Nov",
+          "expect_intent": "SCHEDULE_CHECKOUT",
+          "expect_contains": [
+            "Shreya Xalxo",
+            "27 Nov 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-093",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "last day is",
+      "turns": [
+        {
+          "msg": "Shreya Xalxo last day is 26 Nov",
+          "expect_intent": "SCHEDULE_CHECKOUT",
+          "expect_contains": [
+            "Shreya Xalxo",
+            "26 Nov 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-094",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "vacating by",
+      "turns": [
+        {
+          "msg": "Shreya Xalxo vacating by 25 Nov",
+          "expect_intent": "SCHEDULE_CHECKOUT",
+          "expect_contains": [
+            "Shreya Xalxo",
+            "25 Nov 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-095",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "checkout on D",
+      "turns": [
+        {
+          "msg": "Shreya Xalxo checkout on 24 Nov",
+          "expect_intent": [
+            "SCHEDULE_CHECKOUT",
+            "UPDATE_CHECKOUT_DATE"
+          ],
+          "expect_contains": [
+            "Shreya Xalxo",
+            "24 Nov 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select expected_checkout from tenancies where id=103",
+          "expect": "2026-11-30"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-096",
+      "intent": "SCHEDULE_CHECKOUT",
+      "desc": "receptionist, leaving tomorrow",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "Kunal Menon leaving tomorrow",
+          "expect_intent": "SCHEDULE_CHECKOUT",
+          "expect_contains": [
+            "Kunal Menon",
+            "12 Oct 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-100",
+      "intent": "UPDATE_CHECKOUT_DATE",
+      "desc": "active tenant: change expected exit (not actual checkout_date)",
+      "turns": [
+        {
+          "msg": "change checkout date Falguni Chandra to 25 Oct",
+          "expect_intent": "UPDATE_CHECKOUT_DATE",
+          "expect_contains": [
+            "Update checkout for *Falguni Chandra*",
+            "25 Oct 2026"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "25 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status||' '||expected_checkout||' '||coalesce(checkout_date::text,'-') from tenancies where id=37",
+          "expect": "active 2026-10-25 -"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=37 and field='expected_checkout' and new_value='2026-10-25' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-101",
+      "intent": "UPDATE_CHECKOUT_DATE",
+      "desc": "current shows existing expected exit",
+      "turns": [
+        {
+          "msg": "update checkout Falguni Chandra 26 Oct",
+          "expect_intent": "UPDATE_CHECKOUT_DATE",
+          "expect_contains": [
+            "Current: 25 Oct 2026",
+            "26 Oct 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-102",
+      "intent": "UPDATE_CHECKOUT_DATE",
+      "desc": "modify checkout for X to D",
+      "turns": [
+        {
+          "msg": "modify checkout for Falguni Chandra to 28 oct",
+          "expect_intent": "UPDATE_CHECKOUT_DATE",
+          "expect_contains": [
+            "Falguni Chandra",
+            "28 Oct 2026"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-103",
+      "intent": "UPDATE_CHECKOUT_DATE",
+      "desc": "correct exit date",
+      "turns": [
+        {
+          "msg": "correct exit date for Falguni Chandra 27 Oct",
+          "expect_intent": "UPDATE_CHECKOUT_DATE",
+          "expect_contains": [
+            "Falguni Chandra"
+          ]
+        },
+        {
+          "msg": "cancel"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-104",
+      "intent": "UPDATE_CHECKOUT_DATE",
+      "desc": "no date -> asked -> supplied",
+      "turns": [
+        {
+          "msg": "change checkout date Falguni Chandra",
+          "expect_intent": "UPDATE_CHECKOUT_DATE",
+          "expect_contains": [
+            "Falguni Chandra",
+            "New checkout date"
+          ]
+        },
+        {
+          "msg": "25 Oct",
+          "expect_contains": [
+            "25 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select expected_checkout from tenancies where id=37",
+          "expect": "2026-10-25"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-105",
+      "intent": "UPDATE_CHECKOUT_DATE",
+      "desc": "exited tenant: correct the actual checkout date",
+      "turns": [
+        {
+          "msg": "Zorawar Bedi checkout was on 10 Oct",
+          "expect_intent": "UPDATE_CHECKOUT_DATE",
+          "expect_contains": [
+            "Update checkout for *Zorawar Bedi*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "10 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select status||' '||checkout_date from tenancies where id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009011' order by x.id desc limit 1)",
+          "expect": "exited 2026-10-10"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=(select x.id from tenancies x join tenants t on t.id=x.tenant_id where t.phone='9000009011' order by x.id desc limit 1) and field='checkout_date' and new_value='2026-10-10' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-110",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "when is X leaving",
+      "turns": [
+        {
+          "msg": "when is Falguni Chandra leaving",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "Falguni Chandra",
+            "25 Oct 2026"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-111",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "checkout date for room",
+      "turns": [
+        {
+          "msg": "checkout date for room 108",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "Falguni Chandra"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-112",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "when does X leave",
+      "turns": [
+        {
+          "msg": "when does Ganesh Menon leave",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "Ganesh Menon",
+            "31 Jul 2026"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-113",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "room N checkout",
+      "turns": [
+        {
+          "msg": "room 114 checkout",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "Ganesh Menon",
+            "Harshita Acharya"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-114",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "leaving date for X",
+      "turns": [
+        {
+          "msg": "leaving date for Falguni Chandra",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "Falguni Chandra"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-115",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "scheduled exit shows",
+      "turns": [
+        {
+          "msg": "checkout date for Shreya Xalxo",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "30 Nov 2026"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-116",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "receptionist, not set",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "when does Kunal Menon leave",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "Kunal Menon",
+            "not set"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-117",
+      "intent": "QUERY_CHECKOUT_ROOM",
+      "desc": "unknown",
+      "turns": [
+        {
+          "msg": "when does Zzyzx Qwerty leave",
+          "expect_intent": "QUERY_CHECKOUT_ROOM",
+          "expect_contains": [
+            "No active occupants"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-120",
+      "intent": "NOTICE_GIVEN",
+      "desc": "gave notice on early date -> recorded + audit, deposit refundable",
+      "turns": [
+        {
+          "msg": "Tejas Jain gave notice on 3 Oct",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "Notice recorded"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select notice_date||' '||expected_checkout from tenancies where id=110",
+          "expect": "2026-10-03 2026-10-31"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=110 and field='status' and new_value='on_notice' and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-121",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "withdraw it -> cleared + audit",
+      "turns": [
+        {
+          "msg": "withdraw notice Tejas Jain",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "Withdraw notice for *Tejas Jain*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "withdrawn"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select coalesce(notice_date::text,'-')||' '||coalesce(expected_checkout::text,'-') from tenancies where id=110",
+          "expect": "- -"
+        },
+        {
+          "sql": "select count(*) from audit_log where entity_type='tenancy' and entity_id=110 and field='notice_date' and new_value is null and created_at > now() - interval '150 minutes'",
+          "expect": "nonzero"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-122",
+      "intent": "NOTICE_GIVEN",
+      "desc": "late notice (after 5th) -> next month end, deposit still refundable",
+      "turns": [
+        {
+          "msg": "Kajal Menon gave notice on 9 Oct",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "30 Nov 2026",
+            "Notice recorded"
+          ],
+          "expect_not_contains": [
+            "forfeited"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select notice_date||' '||expected_checkout from tenancies where id=101",
+          "expect": "2026-10-09 2026-11-30"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-123",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "cancel notice X",
+      "turns": [
+        {
+          "msg": "cancel notice Kajal Menon",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "Withdraw notice for *Kajal Menon*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "withdrawn"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select coalesce(notice_date::text,'-') from tenancies where id=101",
+          "expect": "-"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-124",
+      "intent": "NOTICE_GIVEN",
+      "desc": "bare notice -> today",
+      "turns": [
+        {
+          "msg": "Tejas Jain notice",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "Tejas Jain",
+            "11 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select notice_date from tenancies where id=110",
+          "expect": "2026-10-11"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-125",
+      "intent": "NOTICE_GIVEN",
+      "desc": "already on notice -> overwrite prompt -> keep",
+      "turns": [
+        {
+          "msg": "Tejas Jain giving notice today",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "already on notice"
+          ]
+        },
+        {
+          "msg": "2",
+          "expect_contains": [
+            "Kept"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-126",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "not leaving",
+      "turns": [
+        {
+          "msg": "Tejas Jain not leaving",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "Withdraw notice for *Tejas Jain*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "withdrawn"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select coalesce(notice_date::text,'-') from tenancies where id=110",
+          "expect": "-"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-127",
+      "intent": "NOTICE_GIVEN",
+      "desc": "serving notice, receptionist",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "Tejas Jain serving notice",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "Tejas Jain"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select notice_date from tenancies where id=110",
+          "expect": "2026-10-11"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    },
+    {
+      "id": "L-128",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "changed mind",
+      "turns": [
+        {
+          "msg": "Tejas Jain changed mind about leaving",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "Withdraw notice for *Tejas Jain*"
+          ]
+        },
+        {
+          "msg": "1",
+          "expect_contains": [
+            "withdrawn"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-129",
+      "intent": "NOTICE_GIVEN",
+      "desc": "wants to leave",
+      "turns": [
+        {
+          "msg": "Tejas Jain wants to leave",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "Tejas Jain"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-130",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "take back notice",
+      "turns": [
+        {
+          "msg": "take back notice Tejas Jain",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "Withdraw notice for *Tejas Jain*"
+          ]
+        },
+        {
+          "msg": "1"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-131",
+      "intent": "NOTICE_GIVEN",
+      "desc": "notice from X on D",
+      "turns": [
+        {
+          "msg": "notice from Tejas Jain 2 Oct",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_contains": [
+            "Tejas Jain",
+            "02 Oct 2026"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select notice_date from tenancies where id=110",
+          "expect": "2026-10-02"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-132",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "cleanup + won't be leaving",
+      "turns": [
+        {
+          "msg": "Tejas Jain won't be leaving",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "Withdraw notice for *Tejas Jain*"
+          ]
+        },
+        {
+          "msg": "1"
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select coalesce(notice_date::text,'-') from tenancies where id=110",
+          "expect": "-"
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-133",
+      "intent": "NOTICE_WITHDRAWN",
+      "desc": "no notice on record",
+      "turns": [
+        {
+          "msg": "withdraw notice Tejas Jain",
+          "expect_intent": "NOTICE_WITHDRAWN",
+          "expect_contains": [
+            "No active tenant on notice"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-134",
+      "intent": "NOTICE_GIVEN",
+      "desc": "not found",
+      "turns": [
+        {
+          "msg": "Zzyzx Qwerty gave notice",
+          "expect_intent": "NOTICE_GIVEN",
+          "expect_any": [
+            "no ",
+            "not found",
+            "couldn"
+          ]
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true,
+      "phone": "917358341775"
+    },
+    {
+      "id": "L-135",
+      "intent": "NOTICE_GIVEN",
+      "desc": "blocked phone silent",
+      "phone": "919999900001",
+      "turns": [
+        {
+          "msg": "Tejas Jain gave notice",
+          "expect_silent": true
+        }
+      ],
+      "expect_outbound_wa": 0,
+      "stop_on_fail": true
+    }
+  ]
+}

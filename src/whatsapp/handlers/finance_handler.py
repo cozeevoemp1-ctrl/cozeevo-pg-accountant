@@ -105,6 +105,32 @@ def _txn_hash(txn_date, description: str, amount: float) -> str:
 
 # ── 1. Bank statement upload ───────────────────────────────────────────────────
 
+def _map_statement_columns(columns) -> dict:
+    """Map a statement's own column names → canonical names (first match wins).
+
+    Each column gets at most ONE role, checked description-first: the old
+    substring checks let "Description" (contains "cr") claim the Deposits slot
+    and "Value Date" overwrite "Transaction Date".
+    """
+    roles = (
+        ("Description",      ("description", "narration", "particulars", "remarks")),
+        ("Transaction Date", ("date",)),
+        ("Withdrawals",      ("withdrawal", "debit", "dr")),
+        ("Deposits",         ("deposit", "credit", "cr")),
+        ("Reference",        ("ref", "cheque", "utr")),
+    )
+    rename: dict = {}
+    taken: set = set()
+    for c in columns:
+        cl = str(c).lower()
+        for canon, keys in roles:
+            if canon not in taken and any(k in cl for k in keys):
+                rename[c] = canon
+                taken.add(canon)
+                break
+    return rename
+
+
 def _load_dataframe(path: Path):
     """Load a bank statement file (PDF / Excel / CSV) into a DataFrame."""
     import pandas as pd
@@ -118,37 +144,12 @@ def _load_dataframe(path: Path):
         df = pd.read_excel(str(path))
         # Normalise column names to match PDF extractor output
         df.columns = [str(c).strip() for c in df.columns]
-        # Try to find date / debit / credit columns by fuzzy name
-        col_map = {}
-        for c in df.columns:
-            cl = c.lower()
-            if any(k in cl for k in ("transaction date", "txn date", "date", "value date")) and "date" not in col_map:
-                col_map["Transaction Date"] = c
-            if any(k in cl for k in ("withdrawal", "debit", "dr")) and "Withdrawals" not in col_map:
-                col_map["Withdrawals"] = c
-            if any(k in cl for k in ("deposit", "credit", "cr")) and "Deposits" not in col_map:
-                col_map["Deposits"] = c
-            if any(k in cl for k in ("description", "narration", "particulars", "remarks")) and "Description" not in col_map:
-                col_map["Description"] = c
-            if any(k in cl for k in ("ref", "reference", "cheque", "utr")) and "Reference" not in col_map:
-                col_map["Reference"] = c
-        return df.rename(columns={v: k for k, v in col_map.items()})
+        return df.rename(columns=_map_statement_columns(df.columns))
 
     if suffix in (".csv", ".txt"):
         df = pd.read_csv(str(path), encoding="utf-8-sig", on_bad_lines="skip")
         df.columns = [str(c).strip() for c in df.columns]
-        col_map = {}
-        for c in df.columns:
-            cl = c.lower()
-            if "date" in cl and "date" not in col_map:
-                col_map["Transaction Date"] = c
-            if any(k in cl for k in ("withdrawal", "debit", "dr")) and "Withdrawals" not in col_map:
-                col_map["Withdrawals"] = c
-            if any(k in cl for k in ("deposit", "credit", "cr")) and "Deposits" not in col_map:
-                col_map["Deposits"] = c
-            if any(k in cl for k in ("description", "narration", "particulars")) and "Description" not in col_map:
-                col_map["Description"] = c
-        return df.rename(columns={v: k for k, v in col_map.items()})
+        return df.rename(columns=_map_statement_columns(df.columns))
 
     raise ValueError(f"Unsupported file type: {suffix}")
 
@@ -264,11 +265,11 @@ async def handle_bank_upload(
     ]
     if dupes:
         lines.append(f"Duplicates skipped:  {dupes}")
+    # Bank report / deposit matching are FINANCIAL_INTENTS (blocked on WhatsApp)
+    # — point to the app, never to a command that will be refused.
     lines += [
         f"",
-        f"Reply *bank report* for this month's P&L",
-        f"Reply *bank report march* for a specific month",
-        f"Reply *match deposits* to identify tenant payments",
+        f"View the P&L and deposit matching in the *Kozzy app* (Finance).",
     ]
     return "\n".join(lines)
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 from pydantic import BaseModel
 
+from src.llm_gateway.claude_client import groq_model
+
 
 class PaymentIntent(BaseModel):
     intent: str  # "log_payment" | "check_balance" | "unknown"
@@ -27,12 +29,12 @@ Return ONLY valid JSON matching the schema. No explanation."""
 
 
 def extract_intent(*, transcript: str) -> PaymentIntent:
-    """Extract payment intent from voice transcript using Groq Llama 3.3 70B."""
+    """Extract payment intent from voice transcript using Groq (model from GROQ_MODEL)."""
     # Use PydanticAI if available, fallback to raw Groq JSON mode
     try:
         from pydantic_ai import Agent  # type: ignore
         agent: Agent[None, PaymentIntent] = Agent(
-            "groq:llama-3.3-70b-versatile",
+            f"groq:{groq_model()}",
             result_type=PaymentIntent,
             system_prompt=_SYSTEM,
         )
@@ -49,7 +51,7 @@ def _extract_via_groq(transcript: str) -> PaymentIntent:
 
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
     resp = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=groq_model(),
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": _SYSTEM},

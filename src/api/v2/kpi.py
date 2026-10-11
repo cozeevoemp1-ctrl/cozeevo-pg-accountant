@@ -1157,7 +1157,8 @@ async def get_activity_feed(
             sublabel += f" · Room {r.room_number}"
 
         if r.field in ("status", "status+checkout_date"):
-            new_val = (r.new_value or "").lower()
+            # "status+checkout_date" rows carry "exited 2026-10-11" — compare the status word only
+            new_val = ((r.new_value or "").lower().split() or [""])[0]
             if new_val == "active":
                 ev_type = "checkin"
                 label = "Checked in"

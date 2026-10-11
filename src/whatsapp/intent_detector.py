@@ -91,14 +91,48 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:edit|update|change|modify|correct|fix)\s+chit\s*#?\s*\d+|\bchit\s*#?\s*\d+\s+(?:date|dated|on|amount|amt|name|to|for|cash|bank|upi|loan|is)\b", re.I), "CHIT_EDIT", 0.97),
     (re.compile(r"\bchits?\b.*?\d[\d,]*(?:\.\d+)?\s*(?:l\b|lakhs?|lacs?|k\b|thousand|,\d{3})|\d[\d,]*(?:\.\d+)?\s*(?:l\b|lakhs?|lacs?|k\b|thousand|,\d{3}).*?\bchits?\b|\bchits?\b.*?\b\d{4,}\b|\b\d{4,}\b.*?\bchits?\b", re.I), "CHIT_LOG", 0.96),
     (re.compile(r"\bchits?\b", re.I), "CHIT_QUERY", 0.95),
+    # ── Ops menu / short commands that later generic rules mis-route ──
+    # "more" used to fall to the AI conversation manager, which invented a finance menu.
+    (re.compile(r"^\s*(?:more|more\s+options?|show\s+more|more\s+commands?|full\s+menu|all\s+commands?|other\s+options?|what\s+else(?:\s+can\s+you\s+do)?)\s*[?.!]*\s*$", re.I), "MORE_MENU", 0.95),
+    # "complaint status" was caught by QUERY_TENANT's "<Name> status" rule.
+    (re.compile(r"^\s*(?:complaints?\s+(?:status|summary|pending|open|list)|status\s+of\s+(?:all\s+)?complaints?)\b|\bkitne\s+complaints?\b|\bcomplaints?\s+kitne\b", re.I), "QUERY_COMPLAINTS", 0.94),
+    # Resolve by "#id", G-room or ticket — the generic COMPLAINT_UPDATE rule only takes bare digits.
+    (re.compile(r"^\s*(?:resolve|close|fix(?:ed)?|mark)\s+(?:complaint\s+)?(?:#\s*\d+|G\d{1,3}\b|[A-Z]{3}-\d{8}-\d{3})|\bcomplaint\s+(?:solved?|done|fixed|closed?|resolved?)\s+(?:#\s*\d+|G\d{1,3}\b)", re.I), "COMPLAINT_UPDATE", 0.94),
+    # "no water room 512", "no power in 513" — no generic complaint keyword matched these.
+    (re.compile(r"\bno\s+(?:hot\s+)?(?:water|power|current|light|electricity)\b", re.I), "COMPLAINT_REGISTER", 0.93),
+    # WiFi before ROOM_LAYOUT ("wifi password hulk floor 2" matched "hulk floor").
+    (re.compile(r"\b(?:wifi|wi-fi|internet)\b.*\b(?:not\s+working|issue|problem|slow|down|broken)\b", re.I), "COMPLAINT_REGISTER", 0.93),
+    (re.compile(r"(?:set|update|change)\s+(?:the\s+)?wifi\b", re.I), "SET_WIFI", 0.95),
+    (re.compile(r"\b(?:wifi|wi-fi)\s*(?:password|pass|pw)\b(?!.*\b(?:not\s+working|issue|problem|slow|down|broken)\b)|\b(?:wifi|wi-fi|internet|net)\s+ka\s+(?:password|pass)\b", re.I), "GET_WIFI_PASSWORD", 0.95),
+    # "log vacation" was caught by ACTIVITY_LOG's "^log ..." rule.
+    (re.compile(r"^\s*log\s+(?:a\s+)?(?:vacation|leave|holiday)\b", re.I), "LOG_VACATION", 0.93),
+    # "move staff Ramu to 702" was caught by ROOM_TRANSFER (tenant move).
+    (re.compile(r"\b(?:move|shift|transfer)\s+staff\s+[A-Za-z][A-Za-z\s]*?\s+(?:to|into)\s+(?:room\s+)?\w+", re.I), "ASSIGN_STAFF_ROOM", 0.94),
+    # "add staff" with no pipes used to fall to ADD_PARTNER; any add-staff phrasing is ADD_STAFF
+    # (assign phrasings "add staff X to room N" are matched below by ASSIGN_STAFF_ROOM first).
+    (re.compile(r"^\s*(?:add|register|new)\s+(?:a\s+)?staff(?:\s+member)?\s*$", re.I), "ADD_STAFF", 0.96),
     # Start onboarding / KYC for a new tenant (must be first — very specific)
     (re.compile(r"(?:start onboarding|begin onboarding|start kyc|begin kyc|start checkin|begin checkin|onboard\s+\w+|kyc for|checkin for\s+\w+|onboarding\s+for\s+\w+|start\s+registration|registration\s+(?:for|of)\s+\w+)", re.I), "START_ONBOARDING", 0.96),
     # Record checkout / offboarding form
     (re.compile(r"(?:record checkout|offboard|checkout form|fill checkout|checkout record|handover|keys? (?:returned?|handed?)|mark checkout complete|complete checkout|process checkout|do checkout|finalize checkout|close checkout|checkout process for|start checkout for|begin checkout|checkout\s+process\s+\w+|do\s+\w+\s+checkout|\w+\s+ka\s+checkout|checkout\s+karo|chekout\s+\w+)", re.I), "RECORD_CHECKOUT", 0.95),
     # Void / reverse payment
-    (re.compile(r"(?:void\s+(?:(?:last|the|this|that)\s+)?(?:payment|txn|transaction)|cancel\s+(?:(?:last|the)\s+)?payment|reverse\s+(?:(?:last|the)\s+)?payment|undo\s+payment|mark\s+(?:payment\s+)?void|failed\s+payment|payment\s+failed|wrong\s+payment|duplicate\s+payment)", re.I), "VOID_PAYMENT", 0.93),
+    (re.compile(r"(?:void\s+(?:(?:last|the|this|that)\s+)?(?:payment|txn|transaction)|cancel\s+(?:(?:last|the)\s+)?payment|(?:delete|remove)\s+(?:(?:last|the|this|that)\s+)?payment|(?:void|cancel|delete|remove|reverse)\s+(?:(?:last|the|this|that)\s+)?(?:rs\.?\s*)?\d[\d,k]*\s+payment|reverse\s+(?:(?:last|the)\s+)?payment|undo\s+payment|mark\s+(?:payment\s+)?void|failed\s+payment|payment\s+failed|wrong\s+payment|duplicate\s+payment)", re.I), "VOID_PAYMENT", 0.93),
     # Void / reverse expense
-    (re.compile(r"(?:void expense|cancel expense|reverse expense|undo expense|wrong expense|delete expense|remove expense|expense (?:void|cancel|wrong|mistake|error))", re.I), "VOID_EXPENSE", 0.93),
+    (re.compile(r"(?:void expense|cancel expense|reverse expense|undo expense|wrong expense|delete expense|remove expense|(?:void|cancel|delete|remove|undo)\s+(?:the\s+)?last\s+expense|expense (?:void|cancel|wrong|mistake|error))", re.I), "VOID_EXPENSE", 0.93),
+    # ── Edits area (tight, anchored phrasings — must precede the broad rules below) ──
+    # Blacklist: explicit "blacklist" context only, so "clear notes for X" /
+    # "remove X" never land here.
+    (re.compile(r"\bunblacklist\b|\b(?:remove|delete|take)\s+.{1,40}?\s+(?:from|off)\s+(?:the\s+)?blacklist\b|\b(?:remove|clear|delete)\s+from\s+(?:the\s+)?blacklist\b|^\s*(?:unblock|unban|delist)\s+(?!room\b)\w", re.I), "BLACKLIST_REMOVE", 0.97),
+    (re.compile(r"^\s*(?:show\s+|list\s+|view\s+|see\s+)?(?:the\s+)?blacklist(?:ed)?(?:\s+(?:list|entries|people))?\s*\??\s*$|^\s*(?:show|list)\s+(?:the\s+)?blocked\s+(?:people|persons|tenants|list)\b", re.I), "SHOW_BLACKLIST", 0.96),
+    (re.compile(r"^\s*(?:do\s+not|don'?t|never)\s+(?:admit|onboard|give\s+(?:a\s+)?(?:bed|room)\s+to)\s+\w|\badd\s+(?!to\b).{1,40}?\s+to\s+(?:the\s+)?blacklist\b", re.I), "BLACKLIST_ADD", 0.96),
+    # Room transfer phrasings the generic rule below misses:
+    #   "room transfer" (bare) · "change Vidya's room to 401" · "vidya dutta room change 401"
+    #   "transfer Vidya Dutta" (no destination → handler asks) · common typos
+    (re.compile(r"^\s*(?:room\s+(?:transfer|change|shift)|(?:change|transfer|shift)\s+room)\s*$"
+                r"|\bchange\s+[a-z]+(?:\s+[a-z]+){0,2}'s?\s+room\s+to\s+(?:room\s+)?[a-z]?\d"
+                r"|^\s*[a-z]+(?:\s+[a-z]+){0,2}\s+(?:ka\s+|ki\s+)?room\s+(?:change|transfer|shift)\s+(?:to\s+)?(?:room\s+)?[a-z]?\d{2,4}"
+                r"|^\s*(?:transfer|shift|move|relocate)\s+(?!out\b|in\b|karo\b|done\b|money\b|amount\b|deposit\b|payment\b|rent\b|room\b|to\b|from\b)[a-z]+(?:\s+[a-z]+){0,2}\s*$"
+                r"|\b(?:mvoe|moev|trasnfer|tranfer|transfr|shfit)\s+\w+.{0,30}\bto\s+(?:room\s+)?[a-z]?\d", re.I), "ROOM_TRANSFER", 0.93),
     # Room transfer — move tenant from one room to another
     (re.compile(r"(?:move|shift|transfer|relocate|swap|switch|change\s+room\s+(?:for|of)|room\s+(?:change|swap|switch)\s+(?:for\s+)?|room\s+(?:transfer|change|shift|move))\s+\w+.{0,30}(?:to|into|with)\s+(?:room\s+)?[\w-]+|(?:move|shift|transfer|swap)\s+(?:room\s+)?[\w-]+\s+to\s+(?:room\s+)?[\w-]+|swap\s+rooms?\b|room\s+badal|kamra\s+badal|\w+\s+(?:ko\s+)?(?:room\s+)?[\w-]+\s+(?:mein|me)\s+(?:move|shift|transfer)\s+karo?", re.I), "ROOM_TRANSFER", 0.93),
     # Deposit change
@@ -124,7 +158,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Rule: "add/save" + any words + a 7+ digit phone number (and NOT "tenant/checkin/room" keywords)
     (re.compile(r"(?:add|save|store|new)\s+(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.96),
     (re.compile(r"(?:add|save|store|new)\s+(?:\w+\s+){0,5}(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.95),
-    (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
+    (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund|owner|power\s+user|admin)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
     # UPDATE_CONTACT — change phone/notes for existing vendor contact
     (re.compile(r"(?:update|edit|change|modify)\s+(?:contact|vendor|supplier)\b", re.I), "UPDATE_CONTACT", 0.95),
     # UPDATE_PHONE — tenant phone update. MUST come before the generic
@@ -132,7 +166,11 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # stealing `change <tenant-name> phone to <number>`. Negative lookahead
     # `(?!contact|vendor|supplier)` prevents this from stealing
     # `change contact X phone to Y`.
-    (re.compile(r"(?:change|update|set|modify)\s+(?!contact\b|vendor\b|supplier\b)(?:\w+\s+){0,4}?(?:phone|mobile|number|cell)\s+(?:to\s+)?\+?\d", re.I), "UPDATE_PHONE", 0.95),
+    (re.compile(r"(?:change|update|set|modify)\s+(?!contact\b|vendor\b|supplier\b)(?:[\w']+\s+){0,4}?(?:phone|mobile|number|cell)\s+(?:to\s+)?\+?\d", re.I), "UPDATE_PHONE", 0.95),
+    # "update phone number of X to N" · "X new number N" · "X phone N" · "X ka number badal do N"
+    (re.compile(r"(?:change|update|set|modify)\s+(?:the\s+)?(?:phone|mobile|contact)(?:\s+(?:number|no\.?))?\s+(?:of|for)\s+[a-z]+(?:\s+[a-z]+){0,3}\s+(?:to\s+|as\s+)?\+?\d{10}"
+                r"|^\s*(?!(?:add|save|new|plumber|electrician|carpenter|vendor|supplier|contact|call)\b)[a-z]+(?:\s+[a-z]+){0,2}\s+(?:new\s+)?(?:phone|mobile|number)(?:\s+(?:number|no\.?))?\s+(?:is\s+|to\s+)?\+?\d{10,12}\s*$"
+                r"|^\s*[a-z]+(?:\s+[a-z]+){0,2}\s+(?:ka|ki)\s+(?:phone|number|mobile)(?:\s+number)?\s+(?:badal|badlo|change|update)\s*(?:do|karo|kar\s+do)?\s+\+?\d{10}", re.I), "UPDATE_PHONE", 0.94),
     # "notes" routes to UPDATE_TENANT_NOTES (line ~287), not here. Keeping
     # contact/phone/comment only avoids stealing "update notes for <room>".
     (re.compile(r"(?:update|edit|change|modify)\s+(?!tenant)(?:\w+\s+){0,5}(?:contact|number|phone|comment)\b", re.I), "UPDATE_CONTACT", 0.93),
@@ -143,9 +181,16 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"^(?:remind\s+(?:all\s+)?unpaid|remind\s+(?:all\s+)?defaulters?|send\s+(?:dues?\s+)?reminder(?:s)?(?:\s+to\s+all)?|reminder\s+(?:to\s+)?all|bulk\s+reminder|remind\s+all)\s*$", re.I), "SEND_REMINDER_ALL", 0.95),
     # Activity log — "log ...", "note ...", "log received ...", "log delivered ...", bare "log"
     # EXCLUDES expense keywords (handled above)
-    (re.compile(r"(?:^log\s*$|^log\s+(?!.*\b(?:eb|electricity|bill|water|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)\S|^note\s+\S|^activity\s+log\s+\S|^logged?\s+(?:received|delivered|got|bought|purchased|fixed|repaired|plumber|electrician|water|generator)|^received\s+\d+\s+\w+|^delivered\s+\d+\s+\w+)", re.I), "ACTIVITY_LOG", 0.93),
+    (re.compile(r"(?:^log\s*$|^log\s+(?!.*\b(?:eb|electricity|bill|water|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)\S|^note\s+\S|^activity\s+log\s+\S|^logged?\s+(?:received|delivered|got|bought|purchased|fixed|repaired|plumber|electrician|water|generator)|^received\s+\d+\s+(?!(?:rs|inr|rupees?|upi|cash|gpay|phonepe|paytm|neft|imps|rtgs|bank|online|cheque|rent|deposit|advance|from)\b)\w+|^delivered\s+\d+\s+\w+)", re.I), "ACTIVITY_LOG", 0.93),
     # Room status — who's in / status of a specific room (incl bare "room 205" and "room X details")
     (re.compile(r"(?:who(?:'?s| is)(?: living| staying)? in room|room\s+[\w-]+\s+(?:who|occupant|tenant|person|status|details?)|who (?:lives?|stays?|is living|is staying) in|status\s+of\s+room\s+[\w-]+|is\s+room\s+[\w-]+\s+(?:occupied|free|vacant|empty|available)|room\s+[\w-]+\s+occupied|^room\s+[\d\w-]+\s*$|^room\s+(?:number|no\.?|num)\s+[\d\w-]+\s*$|^check\s+room\s+[\d\w-]+)", re.I), "ROOM_STATUS", 0.94),
+    # "beds free tonight" / "how many beds free today" / "beds free on may 5"
+    # / "free beds for day stay" — day-stay availability on a specific date.
+    # Distinct from QUERY_VACANT_ROOMS (long-term) because this includes beds
+    # reserved by future no-shows that are still free tonight.
+    # MUST stay above the vacant-rooms rules: their "(rooms|beds) free" alternative
+    # otherwise swallows "beds free tonight".
+    (re.compile(r"(?:(?:beds?|rooms?)\s+(?:are\s+)?free\s+(?:tonight|today|now|on\s+[\w\s\d/-]+)|(?:how\s+many|any)\s+(?:beds?|rooms?)\s+(?:are\s+)?free\s+(?:tonight|today|on\s+[\w\s\d/-]+)|free\s+(?:beds?|rooms?)\s+(?:tonight|on\s+\d)|day[-\s]*stay\s+availab|free\s+(?:beds?|rooms?)\s+for\s+day[-\s]*stay|day[-\s]*stay\s+(?:beds?|rooms?)\s+(?:free|available))", re.I), "DAYSTAY_AVAILABILITY", 0.94),
     # Vacant rooms
     (re.compile(r"(?:vacant (?:rooms?|beds?)|vacnt\s+rooms?|vacent\s+rooms?|empty (?:rooms?|beds?)|available (?:rooms?|beds?)|which (?:rooms?|beds?) (?:are |is )?(?:empty|free|vacant|available)|free (?:rooms?|beds?)|unoccupied|vacancy\b|khali\s+(?:rooms?|kamre)|(?:rooms?|beds?)\s+(?:empty|free|vacant|available)\b|how\s+many\s+(?:rooms?|beds?)\s+(?:are\s+)?(?:empty|available|free|vacant)|\bany\s+(?:vacant\s+|free\s+|empty\s+)?(?:rooms?|beds?)\b|kaun\s+se\s+rooms?\s+(?:khali|free))", re.I), "QUERY_VACANT_ROOMS", 0.94),
     # Building-specific vacant queries — "how many in thor", "hulk vacant", "empty beds in hulk"
@@ -169,40 +214,51 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing",
         re.I,
     ), "UPDATE_SHARING_TYPE", 0.94),
-    (re.compile(r"(?:change|update|set|modify|revise)\s+(?:\w+\s+){0,4}?rent\s+(?:to\s+)?\d|(?:\w+)\s+rent\s+(?:is|=|should\s+be)\s+\d", re.I), "UPDATE_RENT", 0.93),
+    # UPDATE_SHARING_TYPE short forms: "X is premium", "make X premium",
+    # "update sharing type of X to double", "room 314 single sharing"
+    (re.compile(r"^\s*[a-z]+(?:\s+[a-z]+){0,2}\s+is\s+(?:now\s+)?(?:premium|single|double|triple)(?:\s+sharing)?\s*$"
+                r"|\bmake\s+[a-z]+(?:\s+[a-z]+){0,2}\s+(?:premium|single|double|triple)(?:\s+sharing)?\s*$"
+                r"|(?:change|update|set|modify)\s+(?:the\s+)?sharing(?:\s+type)?\s+(?:of|for)\s+.{1,40}?\s+to\s+(?:premium|single|double|triple)"
+                r"|^\s*room\s+[a-z]?\d{1,4}[a-z]?\s+(?:to\s+)?(?:premium|single|double|triple)\s+sharing\s*$", re.I), "UPDATE_SHARING_TYPE", 0.94),
+    (re.compile(r"(?:change|update|set|modify|revise)\s+(?:[\w']+\s+){0,4}?rent\s+(?:to\s+)?\d|(?:\w+)\s+rent\s+(?:is|=|should\s+be)\s+\d"
+                r"|^\s*(?!room\b)(?!.*\b(?:paid|pay|pays|received|collected|got|due|dues|balance|pending|advance|cash|upi)\b)[a-z]+(?:\s+[a-z]+){0,2}\s+(?:ka\s+|ki\s+)?rent\s+(?:to\s+)?(?:rs\.?\s*)?\d[\d,]{3,}\s*(?:karo|kar\s+do|kardo)?\s*$", re.I), "UPDATE_RENT", 0.93),
     # UPDATE_PHONE moved up (before UPDATE_CONTACT at line ~115) — see note there.
     (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+){0,4}?gender\s+(?:to\s+)?(?:male|female)|(?:\w+)\s+(?:is\s+)?(?:male|female)", re.I), "UPDATE_GENDER", 0.93),
     # UPDATE_DEPOSIT removed — DEPOSIT_CHANGE (line ~88) handles this with full account_handler flow
+    # Rent history BEFORE audit: "show rent changes for X" is a rent question, not an audit one.
+    (re.compile(r"\brent\s+(?:history|changes|revisions?)\b|\b(?:previous|old|earlier)\s+rent\s+(?:of|for)\b|\bwhat\s+was\s+[a-z]+(?:\s+[a-z]+)?'s\s+rent\s+before\b", re.I), "QUERY_RENT_HISTORY", 0.93),
     (re.compile(r"(?:show|check|view|get|who)\s+(?:changes?|audit|history|log|modified|updated)\s+(?:for|of|on|to)?\s*(?:room|tenant)?|(?:changes?|audit|history)\s+(?:for|of)\s+\w+|what\s+changed|audit\s+log|who\s+changed\s+\w+", re.I), "QUERY_AUDIT", 0.92),
     (re.compile(r"rent\s+(?:history|changes?|revisions?)\s*(?:for\s+)?\w*|(?:show|check)\s+rent\s+(?:changes?|revisions?|history)", re.I), "QUERY_RENT_HISTORY", 0.93),
     (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+(?:add|mark|set|make|is)\s+(?:a\s+)?staff(?:\s+room)?\b|\b[A-Z]?\d{1,4}\b\s+(?:not|no\s+longer)\s+(?:a\s+)?staff(?:\s+room)?\b|\b(?:mark|set|make)\s+[A-Z]?\d{1,4}\b\s+(?:as\s+)?(?:a\s+)?staff(?:\s+room)?\b|\badd\s+staff\s+room\s+[A-Z]?\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+staff\s+room\b|change\s+room\s+[A-Za-z]?\d{1,4}[A-Za-z]?(?:\s*$|\s+(?!to\b|from\b|rent\b|\d|sharing\b|single\b|double\b|triple\b|premium\b|occupancy\b|configuration\b|type\b)))", re.I), "UPDATE_ROOM", 0.93),
     (re.compile(r"(?<!not\s)(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|^\s*(?:staff|labou?r)\s+rooms?\s*(?:list|\?)?\s*$|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
-    (re.compile(r"(?:show|print|get|display)\s+master\s+data|master\s+data\s+(?:summary|snapshot|check)|system\s+summary|bed\s+count\s+(?:summary|check)|total\s+(?:bed|room)\s+count", re.I), "SHOW_MASTER_DATA", 0.95),
+    (re.compile(r"(?:show|print|get|display)\s+master\s+data|master\s+data\s+(?:summary|snapshot|check)|^\s*master\s+data\s*\??\s*$|system\s+summary|bed\s+count\s+(?:summary|check)|total\s+(?:bed|room)\s+count", re.I), "SHOW_MASTER_DATA", 0.95),
     # Staff exit — mark a staff member as exited (clears room link; room auto-flips to revenue if empty)
     (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:exit|exited|left|leaving|gone|resigned?)\b|\b[A-Za-z]+\s+staff\s+exit(?:ed)?\b|^\s*exit\s+staff\s+[A-Za-z]", re.I), "EXIT_STAFF", 0.93),
     # Staff assign — link a staff member to a room (many staff per room allowed, no sharing cap)
-    (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:room|in|to)\s+\w+|\bassign\s+staff\s+[A-Za-z]+\s+(?:to\s+)?(?:room\s+)?\w+|\b(?:add|put)\s+staff\s+[A-Za-z]+\s+(?:to|in)\s+(?:room\s+)?\w+", re.I), "ASSIGN_STAFF_ROOM", 0.93),
+    (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:room|in|to)\s+\w+|\bassign\s+staff\s+[A-Za-z]+\s+(?:to\s+)?(?:room\s+)?\w+|\b(?:add|put)\s+staff\s+[A-Za-z]+\s+(?:to|in)\s+(?:room\s+)?\w+|\bstaff\s+[A-Za-z]+(?:\s+ko)?\s+(?:room\s+)?[A-Za-z]?\d{2,4}\s+(?:mein|me|main)\b", re.I), "ASSIGN_STAFF_ROOM", 0.93),
     # Occupancy overview — negative lookahead for "change/update/set occupancy" which → UPDATE_SHARING_TYPE
     (re.compile(r"(?<!change\s)(?<!update\s)(?<!set\s)(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)
     (re.compile(r"\b[A-Za-z]+\s+check.?in\s+(?:was\s+)?(?:on\s+)?(?:\d|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "UPDATE_CHECKIN", 0.94),
     # Expiring tenancies / upcoming checkouts
-    (re.compile(r"(?:expir(?:ing|es?)|agreements? ending|who(?:'s| is) (?:leaving|vacating|planning to (?:leave|vacate|checkout))|upcoming checkout|checkouts? (?:this|next) month|notice(?:s)? (?:this|next) month|how many notice|end of (?:lease|stay|tenancy)|who\s+is\s+vacating|tenants?\s+leaving|end\s+of\s+(?:the\s+)?month\s+checkout|checkouts?\s+coming\s+up|expiring\s+tenancies|who\s+is\s+leaving\b|who gave notice|(?:vacating|leaving)\s+(?:this|next)\s+month|who\s+(?:plans?|will)\s+(?:to\s+)?(?:leave|vacate|checkout)|is\s+mahine\s+kaun\s+ja\s+raha)", re.I), "QUERY_EXPIRING", 0.92),
+    (re.compile(r"(?:expir(?:ing|es?)|agreements? ending|who(?:'s| is) (?:leaving|vacating|planning to (?:leave|vacate|checkout))|upcoming checkout|checkouts? next month|notice(?:s)? (?:this|next) month|how many notice|end of (?:lease|stay|tenancy)|who\s+is\s+vacating|tenants?\s+leaving|end\s+of\s+(?:the\s+)?month\s+checkout|checkouts?\s+coming\s+up|expiring\s+tenancies|who\s+is\s+leaving\b|who gave notice|(?:vacating|leaving)\s+(?:this|next)\s+month|who\s+(?:plans?|will)\s+(?:to\s+)?(?:leave|vacate|checkout)|is\s+mahine\s+kaun\s+ja\s+raha)", re.I), "QUERY_EXPIRING", 0.92),
     # All notices across all upcoming months
     (re.compile(r"(?:total (?:notice|notices|vacating|checkouts)|all notice|all notices|show all notice|all upcoming|notice summary|total vacating|all tenants (?:on )?notice)", re.I), "QUERY_ALL_NOTICES", 0.92),
     # Checkins this month
     (re.compile(r"(?:who checked? ?in|new arrivals?|new tenants? (?:this|in|for)|new joinings?|checkins? (?:this|for) month|joined (?:this|recently)|recent checkins?|who joined|recent\s+admissions?|checkins?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|is\s+mahine\s+kaun\s+aaya|kaun\s+aaya\s+(?:is|this)\s+mahine)", re.I), "QUERY_CHECKINS", 0.91),
     # Checkouts this month
-    (re.compile(r"(?:who checked? ?out|checkouts? this month|who left|who vacated|exits? this month|move(?:d)? out this month|recent checkouts?|who left recently|checkouts?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+mein\s+kaun\s+gaya|March\s+mein\s+kaun\s+gaya)", re.I), "QUERY_CHECKOUTS", 0.91),
+    (re.compile(r"(?:who checked? ?out|checkouts? this month|who left|who vacated|exits? this month|move(?:d)? out this month|recent checkouts?|who left recently|checkouts?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(?:mein|me)\s+kaun\s+gaya|March\s+mein\s+kaun\s+gaya)", re.I), "QUERY_CHECKOUTS", 0.91),
     # Checkout date for a specific room or occupant — long-term + day-stay
     # "checkout date for room 419", "when does akshit leave",
     # "room 609 checkout", "leaving date for rakesh"
-    (re.compile(r"(?:checkout\s+(?:date|time)?\s*(?:for|of)\s+(?:room\s+)?[\w-]+|(?:when|what)\s+(?:does|is|will)\s+[\w\s]+\s+(?:leav(?:e|ing)|checkout|check\s*out|exit(?:ing)?|vacat(?:e|ing))|leaving\s+date\s+(?:for|of)\s+[\w\s-]+|room\s+[\w-]+\s+checkout|checkout\s+room\s+[\w-]+)", re.I), "QUERY_CHECKOUT_ROOM", 0.92),
-    # "beds free tonight" / "how many beds free today" / "beds free on may 5"
-    # / "free beds for day stay" — day-stay availability on a specific date.
-    # Distinct from QUERY_VACANT_ROOMS (long-term) because this includes beds
-    # reserved by future no-shows that are still free tonight.
-    (re.compile(r"(?:(?:beds?|rooms?)\s+free\s+(?:tonight|today|now|on\s+[\w\s\d/-]+)|(?:how\s+many|any)\s+(?:beds?|rooms?)\s+free\s+(?:tonight|today|on\s+[\w\s\d/-]+)|day[-\s]*stay\s+availab|free\s+(?:beds?|rooms?)\s+for\s+day[-\s]*stay|day[-\s]*stay\s+(?:beds?|rooms?)\s+(?:free|available))", re.I), "DAYSTAY_AVAILABILITY", 0.94),
+    # Change a checkout date — BEFORE the query rule below, whose "checkout for X" would
+    # otherwise swallow "modify checkout for X to 28 Oct"
+    (re.compile(r"(?:update|correct|change|modify|shift|move)\s+(?:the\s+)?check.?out\s+(?:date\s+)?(?:for|of)\s+\w+", re.I), "UPDATE_CHECKOUT_DATE", 0.94),
+    # "notice from X 3 Oct" — before SCHEDULE_CHECKOUT's "<word> <day> <month>" catch
+    (re.compile(r"\bnotice\s+(?:from|by|given\s+by)\s+[A-Za-z]", re.I), "NOTICE_GIVEN", 0.95),
+    # "X last day is 30 Nov" — before QUERY_EXPENSES, whose "last day" alternative steals it
+    (re.compile(r"^(?!.*\bnotice\b).*\b(?:last|final)\s+day\s+(?:is|will\s+be|on)\b", re.I), "SCHEDULE_CHECKOUT", 0.93),
+    (re.compile(r"(?:checkout\s+(?:date|time)?\s*(?:for|of)\s+(?:room\s+)?[\w-]+|(?:when|what)\s+(?:does|is|will)\s+[\w\s]+\s+(?:leav(?:e|ing)|checkout|check\s*out|exit(?:ing)?|vacat(?:e|ing))|leaving\s+date\s+(?:for|of)\s+[\w\s-]+|room\s+[\w-]+\s+checkout)", re.I), "QUERY_CHECKOUT_ROOM", 0.92),
     # Notice withdrawal — MUST come before NOTICE_GIVEN so "cancel notice" doesn't hit bare "notice" match
     (re.compile(
         r"cancel\s+notice|withdraw\s+notice|remove\s+notice|revoke\s+notice|"
@@ -218,6 +274,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:show\s+(?:me\s+)?receipt|get\s+receipt|(?:send|share|resend)\s+receipt|receipt\s+(?:for|of)\b|\breceipt\s+\w|where(?:'s|\s+is)\s+(?:the\s+)?receipt|do\s+we\s+have\s+(?:a\s+)?receipt|is\s+there\s+(?:a\s+)?receipt|find\s+receipt|my\s+receipt|receipt\s+milega)", re.I), "QUERY_RECEIPT", 0.91),
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
     (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+dues|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
+    # QUERY_CONTACTS — Hinglish: "plumber kaun hai", "electrician ka number"
+    (re.compile(r"\b(?:plumber|electrician|carpenter|painter|vendor|supplier|cleaner|lineman|mason|welder|laundry|cctv|lift|gas|diesel|water)s?\s+(?:kaun|kon|ka\s+(?:number|contact|no))\b", re.I), "QUERY_CONTACTS", 0.93),
     # QUERY_CONTACTS — vendor/supplier/service contact lookup
     (re.compile(r"(?:(?:give|get|show|find|list|who\s+is)\s+(?:me\s+)?(?:the\s+)?(?:our\s+)?(?:plumber|electrician|carpenter|painter|vendor|supplier|contact|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\b|(?:plumber|electrician|carpenter|painter|vendor|supplier|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\s+(?:contact|number|phone|details?|vendor|guy)\b|(?:all|list|show)\s+(?:contacts?|vendors?|suppliers?)\b|vendor\s+(?:list|directory|contacts?)|contacts?\s+(?:list|for|of)\b|who\s+(?:do|did)\s+we\s+(?:call|use)\s+for\s+\w+|who\s+is\s+(?:the|our)\s+\w+\s+(?:vendor|supplier|guy|contact)|\w+\s+(?:number|contact|phone)\s*$)", re.I), "QUERY_CONTACTS", 0.93),
     # Log vacation / absence for tenant (any name, not hardcoded)
@@ -225,7 +283,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Unit economics / per-bed KPIs — MUST come before REPORT catch
     (re.compile(r"(?:unit\s+(?:economics?|kpi|cost|revenue|profit)|(?:revenue|cost|opex|ebitda|profit)\s+per\s+bed|per.?bed\s+(?:revenue|cost|opex|ebitda|profit)|avg(?:erage)?\s+(?:bed\s+)?rent|average\s+(?:bed\s+)?rent(?:\s+per\s+bed)?|collection\s+rate|rent\s+collection\s+rate|property\s+kpi|performance\s+kpi|unit\s+profitability)", re.I), "QUERY_UNIT_ECONOMICS", 0.95),
     # Bank deposit matching — MUST come before REPORT/P&L catches
-    (re.compile(r"(?:match\s+deposits?|deposit\s+match|check\s+deposits?|identify\s+deposits?|which\s+deposits?|tenant\s+deposits?\s+(?:in\s+bank|matched|verify)|deposit\s+identification|bank\s+deposits?\s+match)", re.I), "BANK_DEPOSIT_MATCH", 0.94),
+    (re.compile(r"(?:match\s+deposits?|deposit\s+match|check\s+deposits?|identify\s+deposits?|which\s+deposits?|tenant\s+deposits?\s+(?:in\s+bank|matched|verify)|deposit\s+identification|bank\s+deposits?\s+match|reconcile\s+(?:the\s+)?(?:bank\s+)?deposits?|match\s+(?:the\s+)?bank\s+deposits?)", re.I), "BANK_DEPOSIT_MATCH", 0.94),
     # Bank statement P&L report — MUST come before generic REPORT catch
     (re.compile(r"(?:bank\s+report|bank\s+statement\s+(?:report|summary|analysis|p&l)|statement\s+report|bank\s+p&l|bank\s+analysis|show\s+bank\s+(?:report|summary|expenses?|income)|analyze\s+bank|bank\s+expense\s+(?:report|summary|breakdown)|income\s+expense\s+report|p&l\s+(?:for|of|report)\b)", re.I), "BANK_REPORT", 0.94),
     # Complaint REGISTER with "report" verb — "report plumbing issue" = file complaint (before REPORT)
@@ -334,7 +392,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Notice period — "gave notice", "serving notice", "wants to leave", bare "notice"
     (re.compile(r"gave notice|giving notice|serving notice|\bnotice\b|notice period|plans? to (?:leave|vacate)|wants? to (?:leave|move)", re.I), "NOTICE_GIVEN", 0.92),
     # Assign room to unassigned/future booking tenant
-    (re.compile(r"assign\s+(?:room\s+)?[\w-]+\s+to\s+\w+|assign\s+\w+\s+(?:to\s+)?room\s+[\w-]+|allocate\s+room|room\s+assign|allot\s+room", re.I), "ASSIGN_ROOM", 0.94),
+    (re.compile(r"assign\s+(?:room\s+)?[\w-]+\s+to\s+\w+|assign\s+\w+(?:\s+\w+){0,2}\s+(?:to\s+)?room\s+[\w-]+|allocate\s+room|room\s+assign|allot\s+room|(?<!never\s)\bgive\s+room\s+[\w-]+\s+to\s+\w+", re.I), "ASSIGN_ROOM", 0.94),
     # Immediate checkout (no date)
     (re.compile(r"(?:check.?out|vacate|vacating|leaving|exit|moving out|ja\s+raha\s+hai\b|chhod\s+raha\s+hai\b)", re.I), "CHECKOUT", 0.95),
     # Add tenant — manual bot flow (booking/registration; physical arrival = CHECKIN_ARRIVAL)
@@ -344,13 +402,15 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # One-time discount / concession / surcharge
     (re.compile(r"(?:concession|discount|waive|deduct|give.*less|less this month|reduce this month|reduce\s+\w+'?s?\s+rent\s+by|extra charge|add.*surcharge|add.*electricity|add.*food charge)", re.I), "RENT_DISCOUNT", 0.90),
     # Blacklist management — REMOVE must be before ADD (unblacklist contains 'blacklist')
-    (re.compile(r"(?:remove|unblock|unban|delist|clear)\s+(?:from\s+blacklist\s+)?(?:\w+)|(?:remove|unblock)\s+blacklist\s+\d+|\bunblacklist\b", re.I), "BLACKLIST_REMOVE", 0.97),
+    # (broad "remove/clear <anything>" alternative dropped — it stole "clear notes for X";
+    #  explicit blacklist phrasings are matched by the edits block near the top)
+    (re.compile(r"(?:remove|unblock)\s+blacklist\s+\d+|\bunblacklist\b", re.I), "BLACKLIST_REMOVE", 0.97),
     (re.compile(r"(?:show|list|display)\s+blacklist|\bblacklist\s+(?:list|all|show)\b|who\s+(?:is|are)\s+blacklisted", re.I), "SHOW_BLACKLIST", 0.96),
     (re.compile(r"(?:\bblacklist\b|\bblock\b|\bban\b|never\s+give\s+(?:bed|room)|do\s+not\s+(?:admit|onboard)|add\s+to\s+blacklist)\s+\w", re.I), "BLACKLIST_ADD", 0.96),
     # Add new staff member with details (pipe-separated) — must come before ADD_PARTNER
-    (re.compile(r"(?:add|register|new)\s+staff\s+[A-Za-z][^\|]+\|", re.I), "ADD_STAFF", 0.97),
-    # Add partner / staff (bot access only)
-    (re.compile(r"(?:add partner|add owner|add power user|new admin|give access|add\s+staff\b(?!\s+room))", re.I), "ADD_PARTNER", 0.97),
+    (re.compile(r"(?:add|register|new)\s+staff\s+[A-Za-z][^\|]+\||^\s*(?:add|register|new)\s+(?:a\s+)?staff(?:\s+member)?\s+(?!rooms?\b)[A-Za-z]", re.I), "ADD_STAFF", 0.97),
+    # Add partner / owner (bot access) — "add staff" is the staff register above, not bot access
+    (re.compile(r"(?:add partner|add owner|add power user|new admin|give access)", re.I), "ADD_PARTNER", 0.97),
     # WiFi password — owner reads or sets WiFi credentials
     (re.compile(r"(?:set\s+wifi|update\s+wifi|change\s+wifi|wifi\s+(?:ssid|network|password)\s+\w+|set\s+(?:floor|common)\s+wifi)", re.I), "SET_WIFI", 0.95),
     (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
@@ -374,10 +434,12 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Negative lookahead excludes "arrived on 5 March" (that's UPDATE_CHECKIN).
     (re.compile(r"\b(?:check\s*in\s+\w+|mark\s+\w+\s+(?:as\s+)?(?:arrived|checked\s*in|here)|\w+\s+(?:has\s+)?arrived(?:\s+(?:today|yesterday))?$|\w+\s+is\s+here|confirm\s+arrival|check.?in\s+arrival)\b(?!.*\b(?:was\s+on|on\s+\d|dated?|date)\b)", re.I), "CHECKIN_ARRIVAL", 0.94),
     # Update tenant permanent notes / agreement
+    (re.compile(r"\badd\s+(?:a\s+)?notes?\s+(?:for|to)\s+\w+|(?:update|edit|change|modify)\s+(?!tenant\b)[a-z]+(?:\s+[a-z]+){0,2}'?s?\s+(?:notes?|agreement)\s*$", re.I), "UPDATE_TENANT_NOTES", 0.93),
     (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
     # One-shot clear: "delete/clear/remove notes for 603" — handler short-circuits to confirm.
     (re.compile(r"(?:delete|clear|remove|reset|wipe)\s+(?:tenant\s+)?notes?\s+(?:for\s+)?[\w-]+", re.I), "UPDATE_TENANT_NOTES", 0.94),
     # Tenant notes / agreed terms / payment method lookup
+    (re.compile(r"^\s*[a-z]+(?:\s+[a-z]+){0,2}'?s?\s+(?:notes?|agreement|agreed\s+terms)\s*\??\s*$", re.I), "GET_TENANT_NOTES", 0.93),
     (re.compile(r"(?:notes?|agreement|agreed\s+terms?|payment\s+method|cash\s+only|rent\s+terms?|terms?)\s+(?:for\s+|of\s+)?(?:room\s+)?[\w-]+|(?:check|show|get|what(?:'?s|\s+is)?)\s+(?:the\s+)?(?:notes?|agreement|terms?|payment\s+method)\s+(?:for\s+|of\s+)?[\w\s-]+|room\s+[\w-]+\s+(?:notes?|terms?|agreement|payment\s+method|cash\s+only)|(?:notes?|agreement|terms?)\s+room\s+[\w-]+", re.I), "GET_TENANT_NOTES", 0.93),
     # Expense category shorthand "Category Amount [Mode]" — MUST come before PAYMENT_LOG shorthand
     # With payment mode (e.g. "maintenance 3000 upi")
@@ -894,8 +956,15 @@ def _extract_entities(text: str, intent: str) -> dict:
                 r"\b(?:add|put)\s+staff\s+([A-Za-z][A-Za-z\s]*?)\s+(?:to|in)\s+(?:room\s+)?[\w-]+",
                 text, re.I,
             )
+        if not m:
+            m = re.search(
+                r"\b(?:move|shift|transfer)\s+staff\s+([A-Za-z][A-Za-z\s]*?)\s+(?:to|into)\b",
+                text, re.I,
+            ) or re.search(r"\bstaff\s+([A-Za-z]+)(?:\s+ko)?\s+(?:room\s+)?[A-Za-z]?\d{2,4}\s+(?:mein|me|main)\b", text, re.I)
         if m:
             cand = m.group(1).strip()
+            # "staff ramu shift to room 701" → drop the trailing verb from the name
+            cand = re.sub(r"\s+(?:shift(?:ed)?|move[sd]?|transfer(?:red)?|ko)\s*$", "", cand, flags=re.I).strip()
             cand = re.sub(r"\s+(manager|housekeeping|security|cook|watchman|guard|cleaner|maid|caretaker)\s*$", "", cand, flags=re.I).strip()
             if cand:
                 entities["name"] = cand
@@ -903,9 +972,9 @@ def _extract_entities(text: str, intent: str) -> dict:
         # Room extraction — handle "in G05" / "to 107" / "room G05" forms
         if intent == "ASSIGN_STAFF_ROOM":
             rm = re.search(
-                r"\b(?:room|in|to)\s+([A-Za-z]?\d{1,4}[A-Za-z]?|G\d{1,3})\b",
+                r"\b(?:room|in|to|into)\s+([A-Za-z]?\d{1,4}[A-Za-z]?|G\d{1,3})\b",
                 text, re.I,
-            )
+            ) or re.search(r"\b([A-Za-z]?\d{2,4})\s+(?:mein|me|main)\b", text, re.I)
             if rm:
                 entities["room_number"] = rm.group(1)
                 # Override any bogus amount the generic extractor picked up

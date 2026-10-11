@@ -49,6 +49,51 @@ def resolve_sharing_on_room_change(current_sharing, new_room_type):
     return new_sharing, new_sharing != current_sharing
 
 
+async def check_transfer_destination(
+    session: AsyncSession,
+    tenancy: Tenancy,
+    to_room_number: str,
+) -> tuple[Room | None, str | None]:
+    """Can `tenancy` move into `to_room_number`? Returns (room, error).
+
+    Single capacity gate for every room move (bot prompt, bot confirm, PWA):
+    check_room_bookable handles inactive/staff rooms, premium (whole-room)
+    occupants, day-stays and overlapping no-show bookings. The bed is needed
+    from today — or from the booking's check-in date for a future no-show.
+    A premium (whole-room) mover additionally needs the room to itself.
+    """
+    from src.database.models import SharingType as _ST, TenancyStatus as _TS
+    from src.services.room_occupancy import check_room_bookable
+
+    rn = (to_room_number or "").upper().strip()
+    today = date.today()
+    start = today
+    if tenancy.status == _TS.no_show and tenancy.checkin_date and tenancy.checkin_date > today:
+        start = tenancy.checkin_date
+
+    room, err = await check_room_bookable(session, rn, start, None, exclude_tenancy_id=tenancy.id)
+    if room is None and err:
+        return None, f"Room {rn} not found."
+    if room is not None and room.id == tenancy.room_id:
+        return room, f"Tenant is already in room {room.room_number}."
+
+    occupants = await get_room_occupants(session, room, start) if room is not None else None
+    others = [t.name for t, tc in (occupants.tenancies if occupants else []) if tc.id != tenancy.id]
+    others += [tc.tenant.name for tc in (occupants.daywise if occupants else [])
+               if tc.id != tenancy.id and tc.tenant and tc.tenant.name not in others]
+    max_occ = int(room.max_occupancy or 1) if room is not None else 1
+
+    if err:
+        if "overlapping booking" in err:
+            names = ", ".join(others) if others else err.split(":", 1)[-1].strip(" .")
+            return room, f"Room {room.room_number} is full ({max_occ} beds): {names}"
+        return room, err
+    if tenancy.sharing_type == _ST.premium and others:
+        return room, (f"Room {room.room_number} has other occupants ({', '.join(others)}) — "
+                      "a premium tenant needs the whole room.")
+    return room, None
+
+
 async def execute_room_transfer(
     tenancy_id: int,
     to_room_number: str,
@@ -68,42 +113,25 @@ async def execute_room_transfer(
     """
     to_room_number = to_room_number.upper().strip()
 
-    # 1. Lookup destination room
-    new_room = await session.scalar(
-        select(Room).where(Room.room_number == to_room_number, Room.active == True)
-    )
-    if not new_room:
-        return {"success": False, "message": f"Room {to_room_number} not found."}
-
-    if new_room.is_staff_room:
-        return {"success": False, "message": f"Room {to_room_number} is a staff room — tenant bookings not allowed."}
-
-    # 2. Load tenancy + tenant + current room
+    # 1. Load tenancy + tenant + current room (room may be unassigned for a booking)
     row = (await session.execute(
         select(Tenancy, Tenant, Room)
         .join(Tenant, Tenancy.tenant_id == Tenant.id)
-        .join(Room, Tenancy.room_id == Room.id)
+        .join(Room, Tenancy.room_id == Room.id, isouter=True)
         .where(Tenancy.id == tenancy_id)
     )).first()
     if not row:
         return {"success": False, "message": "Tenancy not found."}
     tenancy, tenant, current_room = row
-    from_room = current_room.room_number
+    from_room = current_room.room_number if current_room else "unassigned"
     tenant_name = tenant.name
 
-    if from_room == to_room_number:
-        return {"success": False, "message": f"Tenant is already in room {to_room_number}."}
-
-    # 3. Occupancy check using canonical helper
+    # 2-3. Destination exists, bookable, and has a free bed (premium/day-stay/
+    # no-show aware) — the one capacity gate shared with the bot prompt.
     today = date.today()
-    occupants = await get_room_occupants(session, new_room)
-    max_occ = int(new_room.max_occupancy or 1)
-    if occupants.total_occupied >= max_occ:
-        names = ", ".join(t.name for t, _ in occupants.tenancies)
-        return {
-            "success": False,
-            "message": f"Room {to_room_number} is full ({occupants.total_occupied}/{max_occ} beds): {names}",
-        }
+    new_room, dest_err = await check_transfer_destination(session, tenancy, to_room_number)
+    if dest_err:
+        return {"success": False, "message": dest_err}
 
     # 4. Resolve rent — keep current if new_rent not supplied
     old_rent = float(tenancy.agreed_rent or 0)
@@ -111,8 +139,23 @@ async def execute_room_transfer(
     rent_changed = resolved_rent != old_rent
 
     # 5. DB writes (all within the passed session — caller commits)
+    to_room_number = new_room.room_number
     tenancy.room_id = new_room.id
     tenancy.agreed_rent = Decimal(str(resolved_rent))
+
+    # sharing_type follows the destination's physical type (premium preserved)
+    _old_sharing = getattr(tenancy.sharing_type, "value", tenancy.sharing_type)
+    _new_sharing, _sharing_changed = resolve_sharing_on_room_change(tenancy.sharing_type, new_room.room_type)
+    if _sharing_changed:
+        tenancy.sharing_type = _new_sharing
+        session.add(AuditLog(
+            changed_by=changed_by, entity_type="tenancy", entity_id=tenancy_id,
+            entity_name=tenant_name, field="sharing_type",
+            old_value=_old_sharing, new_value=_new_sharing.value,
+            room_number=to_room_number, source=source,
+            note=f"Re-derived from room type on room change {from_room} → {to_room_number}",
+            org_id=tenancy.org_id,
+        ))
 
     if rent_changed:
         session.add(RentRevision(
@@ -123,21 +166,37 @@ async def execute_room_transfer(
             changed_by=changed_by,
             reason=f"Room transfer: {from_room} → {to_room_number}",
         ))
+        session.add(AuditLog(
+            changed_by=changed_by, entity_type="tenancy", entity_id=tenancy_id,
+            entity_name=tenant_name, field="agreed_rent",
+            old_value=str(int(old_rent)), new_value=str(int(resolved_rent)),
+            room_number=to_room_number, source=source,
+            note=f"Room transfer: {from_room} → {to_room_number}",
+            org_id=tenancy.org_id,
+        ))
 
-    # Always update current month RS on room transfer — prorate by remaining days
+    # Update current month RS on room transfer — prorate by remaining days.
+    # Only for checked-in tenancies: a booking's (no_show) rows are na/0
+    # placeholders that activate_rs_on_checkin() fills at check-in.
     import calendar as _cal
-    rs = await session.scalar(
-        select(RentSchedule).where(
-            RentSchedule.tenancy_id == tenancy_id,
-            RentSchedule.period_month == today.replace(day=1),
+    from src.database.models import TenancyStatus as _TS
+    rs = None
+    if tenancy.status == _TS.active:
+        rs = await session.scalar(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy_id,
+                RentSchedule.period_month == today.replace(day=1),
+            )
         )
-    )
     if rs:
         period = today.replace(day=1)
         is_first_month = tenancy.checkin_date and tenancy.checkin_date.replace(day=1) == period
         if is_first_month:
-            # First month: keep whatever proration was set at checkin; just update rent cap
-            rs.rent_due = min(rs.rent_due, Decimal(str(resolved_rent)))
+            # First month: canonical recalc (CLAUDE.md — agreed_rent changed → recalc;
+            # the old min() cap dropped the deposit from the first-month due).
+            if rent_changed:
+                from src.services.rent_schedule import recalc_checkin_month_rs
+                await recalc_checkin_month_rs(session, tenancy)
         else:
             dim = _cal.monthrange(today.year, today.month)[1]
             remaining = dim - today.day + 1

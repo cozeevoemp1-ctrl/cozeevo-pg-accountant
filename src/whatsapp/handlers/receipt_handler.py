@@ -24,7 +24,7 @@ from decimal import Decimal
 from typing import Optional
 
 from loguru import logger
-from sqlalchemy import select, desc, and_
+from sqlalchemy import select, desc, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -33,6 +33,19 @@ from src.database.models import (
 from src.whatsapp.role_service import CallerContext
 from src.whatsapp.handlers._shared import _save_pending
 from src.whatsapp.intent_detector import _MONTH_NAMES
+
+def receipt_attachable():
+    """SQL filter: payments a receipt may still be attached to.
+
+    The DB `payments_freeze` trigger rejects ANY update (receipt_url included)
+    to a payment whose period_month is before the current month, and the lock
+    is deliberate for staff. Offering such a payment ends in a crash, so every
+    receipt-candidate query filters to the open period.
+    """
+    from datetime import date as _date
+    return or_(Payment.period_month.is_(None),
+               Payment.period_month >= _date.today().replace(day=1))
+
 
 # ── Keyword patterns for auto-classification ─────────────────────────────
 
@@ -144,11 +157,9 @@ async def handle_receipt_upload(
     if caption:
         tenant_info, tenancy, room = await _match_from_caption_tenant(caption, session)
         if tenant_info:
-            # Ask for confirmation before attaching
-            choices = [
-                {"seq": 1, "intent": "CONFIRM_RECEIPT", "label": "Yes"},
-                {"seq": 2, "intent": "CONFIRM_RECEIPT", "label": "No, type name"},
-            ]
+            # Ask for confirmation before attaching. choices=[] on purpose: the
+            # RECEIPT_CONFIRM resolver takes yes/no/1/2 or a corrected name;
+            # a choices list makes the generic numbered re-prompt reject "yes".
             action_data = {
                 "media_id": media_id,
                 "media_mime": media_mime,
@@ -156,7 +167,7 @@ async def handle_receipt_upload(
                 "tenant_name": tenant_info,
                 "room_number": room.room_number if room else "?",
             }
-            await _save_pending(phone, "RECEIPT_CONFIRM", action_data, choices, session)
+            await _save_pending(phone, "RECEIPT_CONFIRM", action_data, [], session)
             return f"Is this receipt for *{tenant_info}* (Room {room.room_number})?\n\n1. Yes\n2. No"
 
     # Option 2: No caption or caption didn't match → check recent payments from this phone
@@ -168,10 +179,6 @@ async def handle_receipt_upload(
         tenant = await _get_tenant_for_payment(payment, session)
         name = tenant.name if tenant else "Unknown"
 
-        choices = [
-            {"seq": 1, "intent": "CONFIRM_RECEIPT", "label": "Yes"},
-            {"seq": 2, "intent": "CONFIRM_RECEIPT", "label": "No, type name"},
-        ]
         action_data = {
             "media_id": media_id,
             "media_mime": media_mime,
@@ -179,7 +186,7 @@ async def handle_receipt_upload(
             "tenant_name": name,
             "room_number": "?",
         }
-        await _save_pending(phone, "RECEIPT_CONFIRM", action_data, choices, session)
+        await _save_pending(phone, "RECEIPT_CONFIRM", action_data, [], session)
         return f"Is this receipt for *{name}*?\n\n1. Yes\n2. No, type name"
 
     if len(recent_unattached) > 1:
@@ -206,7 +213,7 @@ async def handle_receipt_upload(
         lines = ["Which payment is this receipt for?\n"]
         for c in choices:
             lines.append(f"{c['seq']}. {c['label']}")
-        lines.append(f"\nReply *1-{len(choices)}* or type a tenant name.")
+        lines.append(f"\nReply *1-{len(choices)}*.")
         return "\n".join(lines)
 
     # Option 3: No recent payments at all → show wider search or ask
@@ -234,30 +241,43 @@ async def handle_receipt_upload(
         lines = ["No recent payment in the last 30 min. These payments from today have no receipt:\n"]
         for c in choices:
             lines.append(f"{c['seq']}. {c['label']}")
-        lines.append(f"\nReply *1-{len(choices)}* or type a tenant name.")
+        lines.append(f"\nReply *1-{len(choices)}*.")
         return "\n".join(lines)
 
-    # Option 4: No unattached payments at all → save image, ask to log payment
+    # Option 4: No unattached payments at all → archive the image. Payments are
+    # recorded in the Kozzy app only (finance is blocked on WhatsApp), so never
+    # ask staff to type payment details here.
     file_path = await download_whatsapp_media(
         media_id, media_mime, "receipts",
         filename_prefix="unlinked",
     )
 
     if file_path:
-        action_data = {
-            "media_id": media_id,
-            "media_mime": media_mime,
-            "file_path": file_path,
-        }
-        await _save_pending(phone, "RECEIPT_NO_PAYMENT", action_data, [], session)
-        return (
-            "Receipt saved but no recent payment found to attach it to.\n\n"
-            "To link it, type the payment details:\n"
-            "*[Name] [Amount] [cash/upi] [month]*\n"
-            "Example: _Raj 15000 cash april_"
-        )
+        _archive_unlinked_receipt(file_path, media_mime, phone, caption, session)
+        return _NO_PAYMENT_REPLY
 
     return "Could not download the image. Please try sending again."
+
+
+# Shown when a receipt image matches no recorded payment. Payment entry is
+# app-only, so the next step is the Kozzy app — never a WhatsApp command.
+_NO_PAYMENT_REPLY = (
+    "Receipt saved to the document archive, but no matching payment was found.\n\n"
+    "Record the payment in the *Kozzy app*, then send this receipt again "
+    "with the tenant's name as the caption to attach it."
+)
+
+
+def _archive_unlinked_receipt(file_path: str, media_mime: str, phone: str,
+                              note: str, session: AsyncSession) -> None:
+    """Register a receipt that matched no payment, so the file isn't orphaned."""
+    session.add(Document(
+        doc_type=DocumentType.receipt,
+        file_path=file_path,
+        mime_type=media_mime,
+        uploaded_by=phone,
+        notes=f"Unlinked receipt: {(note or '')[:200]}",
+    ))
 
 
 async def resolve_receipt_selection(
@@ -309,7 +329,7 @@ async def _handle_expense_receipt(
     media_id: str, media_mime: str, caption: str,
     phone: str, ctx: CallerContext, session: AsyncSession,
 ) -> str:
-    """Save expense bill and route to ADD_EXPENSE flow."""
+    """Save expense bill to the document archive. Expense entry itself is app-only."""
     from src.whatsapp.media_handler import download_whatsapp_media
 
     file_path = await download_whatsapp_media(media_id, media_mime, "invoices")
@@ -327,10 +347,9 @@ async def _handle_expense_receipt(
     logger.info(f"[Media] Expense bill saved: {file_path}")
 
     return (
-        f"Expense bill saved.\n\n"
-        f"To log this expense, type:\n"
-        f"*[category] [amount]*\n"
-        f"Example: _electricity 5000_"
+        "Expense bill saved to the document archive.\n\n"
+        "Record the expense itself in the *Kozzy app* — "
+        "expenses can't be logged on WhatsApp."
     )
 
 
@@ -355,11 +374,7 @@ async def _handle_id_proof(
     session.add(doc)
     logger.info(f"[Media] ID proof saved: {file_path}")
 
-    return (
-        "ID proof saved.\n\n"
-        "To link it to a tenant, type the tenant name.\n"
-        "Or it will stay in the document archive."
-    )
+    return "ID proof saved to the document archive (not linked to a tenant)."
 
 
 async def _handle_license_doc(
@@ -571,12 +586,8 @@ async def _handle_vision_receipt(
         ]
         return "\n".join(l for l in lines if l)
 
-    # No tenant match — save receipt, show what Gemini found, ask to link
-    action_data = {
-        "file_path": file_path,
-        "gemini": vision,
-    }
-    await _save_pending(phone, "RECEIPT_NO_PAYMENT", action_data, [], session)
+    # No matching payment — archive it, show what vision read, point to the app
+    _archive_unlinked_receipt(file_path, media_mime, phone, summary or name, session)
 
     lines = [
         f"Receipt detected:\n",
@@ -585,9 +596,7 @@ async def _handle_vision_receipt(
         f"Mode: {pay_mode.upper()}" if pay_mode != "unknown" else "",
         f"UPI Ref: {upi_ref}" if upi_ref else "",
         f"\n_{summary}_" if summary else "",
-        f"\nReceipt saved. To link it to a payment, type:",
-        f"*[Name] [Amount] [cash/upi] [month]*",
-        f"Example: _Raj 15000 upi april_",
+        f"\n{_NO_PAYMENT_REPLY}",
     ]
     return "\n".join(l for l in lines if l)
 
@@ -649,6 +658,7 @@ async def _match_from_caption(caption: str, session: AsyncSession) -> tuple[Opti
             Payment.tenancy_id == tenancy.id,
             Payment.is_void == False,
             Payment.receipt_url.is_(None),
+            receipt_attachable(),
         )
         .order_by(desc(Payment.created_at))
         .limit(1)
@@ -664,17 +674,17 @@ async def _match_from_caption(caption: str, session: AsyncSession) -> tuple[Opti
 async def _get_recent_unattached_payments(
     phone: str, session: AsyncSession, minutes: int = 30,
 ) -> list[Payment]:
-    """Get recent payments logged by this phone that have no receipt attached."""
-    from src.database.models import WhatsappLog, MessageDirection
-
+    """Recent payments (any staff, any channel — in practice the Kozzy app, since
+    WhatsApp payment logging is blocked) that have no receipt attached yet.
+    `phone` is unused: payments are no longer logged per WhatsApp sender."""
     cutoff = datetime.utcnow() - timedelta(minutes=minutes)
 
-    # Find payments logged recently (by checking whatsapp_log for PAYMENT_LOG from this phone)
     result = await session.execute(
         select(Payment)
         .where(
             Payment.is_void == False,
             Payment.receipt_url.is_(None),
+            receipt_attachable(),
             Payment.created_at >= cutoff,
         )
         .order_by(desc(Payment.created_at))

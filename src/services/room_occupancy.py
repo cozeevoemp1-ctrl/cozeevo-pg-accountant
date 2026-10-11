@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date as _date
+from datetime import date as _date, timedelta
 from typing import Optional
 
 from sqlalchemy import and_, func, or_, select
@@ -291,6 +291,10 @@ async def find_overlap_conflict(
     for name, checkin, effective_end, status, sharing_type in (await session.execute(q)).all():
         existing_start = checkin or _date.min
         existing_end = effective_end or far_future
+        # Still ACTIVE past its expected/checkout date = hasn't left: the bed is
+        # occupied at least tonight (was read as free -> double-booked rooms).
+        if status == TenancyStatus.active and existing_end <= _date.today():
+            existing_end = _date.today() + timedelta(days=1)
         if start_date < existing_end and period_end > existing_start:
             label = f"{name} (booking)" if status == TenancyStatus.no_show else name
             conflict_names.append(label)
@@ -410,75 +414,21 @@ async def beds_free_on_date(
     Use this for the "how many beds free tonight / on May 5?" query.
     For a room-specific answer use `get_room_occupants(room, on_date)`.
     """
+    # Derived from the canonical bed breakdown so "free tonight" always equals
+    # the vacant-rooms / occupancy / PWA numbers (old inline SQL double-counted
+    # active day-stays and let no-shows in full rooms eat non-existent beds).
+    from src.services.occupancy import get_bed_breakdown
     when = on_date or _date.today()
-    from sqlalchemy import case, literal_column
-    from src.services.occupancy import get_total_revenue_beds
-
-    # Canonical denominator (excludes staff rooms + placeholder room 000).
-    total_beds = await get_total_revenue_beds(session)
-
-    occupied_lt = await session.scalar(
-        select(func.coalesce(func.sum(
-            case(
-                (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                else_=literal_column("1"),
-            )
-        ), 0))
-        .select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Room.is_staff_room == False,
-            Room.room_number != "000",
-            Tenancy.status == TenancyStatus.active,
-            Tenancy.checkin_date <= when,
-            or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > when),
-        )
-    ) or 0
-
-    occupied_ns = await session.scalar(
-        select(func.coalesce(func.sum(
-            case(
-                (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                else_=literal_column("1"),
-            )
-        ), 0))
-        .select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Room.is_staff_room == False,
-            Room.room_number != "000",
-            Tenancy.status == TenancyStatus.no_show,
-            Tenancy.checkin_date <= when,
-        )
-    ) or 0
-
-    from sqlalchemy import case as sa_case
-    occupied_dw = await session.scalar(
-        select(func.coalesce(func.sum(
-            sa_case(
-                (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                else_=literal_column("1"),
-            )
-        ), 0))
-        .select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Room.is_staff_room == False,
-            Room.room_number != "000",
-            Tenancy.stay_type == StayType.daily,
-            Tenancy.checkin_date <= when,
-            Tenancy.checkout_date > when,
-            Tenancy.status == TenancyStatus.active,
-        )
-    ) or 0
-
+    bb = await get_bed_breakdown(session, when)
     return {
         "on_date": when,
-        "total_beds": int(total_beds),
-        "occupied_longterm": int(occupied_lt),
-        "occupied_noshow": int(occupied_ns),
-        "occupied_daystay": int(occupied_dw),
-        "free": int(total_beds) - int(occupied_lt) - int(occupied_ns) - int(occupied_dw),
+        "total_beds": bb.total_beds,
+        "occupied_longterm": bb.checked_in - bb.daystay,
+        "occupied_noshow": bb.noshow,
+        "occupied_daystay": bb.daystay,
+        "free": bb.vacant,
+        "over": bb.over,
+        "over_rooms": bb.over_rooms,
     }
 
 

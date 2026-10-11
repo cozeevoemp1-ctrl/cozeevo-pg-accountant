@@ -41,7 +41,7 @@ async def handle_chit(intent: str, entities: dict, ctx: CallerContext, session: 
     if intent == "CHIT_LOG":
         return await _log(raw, ctx, session)
     if intent == "CHIT_VOID":
-        return await _void(raw, session)
+        return await _void(raw, session, ctx.phone)
     if intent == "CHIT_EDIT":
         return await _edit(raw, ctx, session)
     return await _query(raw, session, ctx.phone)
@@ -176,11 +176,11 @@ def _month_label(ym: str) -> str:
 
 # ── CHIT_VOID ─────────────────────────────────────────────────────────────────
 
-async def _void(raw: str, session: AsyncSession) -> str:
+async def _void(raw: str, session: AsyncSession, by: str | None = None) -> str:
     m = re.search(r"#?\s*(\d+)\s*$", raw) or re.search(r"\b(\d+)\b", raw)
     if not m:
         return "Which one? Example: *void chit 6* (the # from the chit list)"
-    row = await svc.void_payment(session, int(m.group(1)))
+    row = await svc.void_payment(session, int(m.group(1)), voided_by=by)
     if not row:
         return f"No active chit payment #{m.group(1)}."
     await session.commit()

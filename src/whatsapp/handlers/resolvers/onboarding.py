@@ -207,7 +207,9 @@ async def resolve_checkin_arrival_payment(
     else:
         lines.append("Collected: Nothing (to be collected later)")
     lines += ["", "Reply *Yes* to check in or *No* to cancel."]
-    return "\n".join(lines)
+    # This pending was mutated in place to CONFIRM_CHECKIN_ARRIVAL — KEEP it, or
+    # chat_api marks it resolved and the "Yes" that follows finds nothing.
+    return "__KEEP_PENDING__" + "\n".join(lines)
 
 
 async def resolve_confirm_checkin_arrival(
@@ -303,7 +305,7 @@ async def resolve_confirm_checkin_arrival(
         new_value="active",
         room_number=action_data.get("room_number", ""),
         source="whatsapp",
-        notes=(
+        note=(
             f"arrival confirmed; booked_checkin={old_checkin.isoformat() if old_checkin else '-'}, "
             f"actual={tenancy.checkin_date.isoformat() if tenancy.checkin_date else '-'}"
         ),
@@ -326,18 +328,7 @@ async def resolve_confirm_checkin_arrival(
             "Sheet sync failed after CHECKIN_ARRIVAL for tenancy %s", tenancy.id
         )
 
-    # Notify tenant
-    try:
-        from src.database.models import Tenant
-        tenant = await session.get(Tenant, tenancy.tenant_id)
-        if tenant and tenant.phone:
-            from src.whatsapp.webhook_handler import _send_whatsapp
-            await _send_whatsapp(
-                tenant.phone,
-                f"Welcome, {tenant.name}! Your check-in has been confirmed at Cozeevo.",
-            )
-    except Exception:
-        pass
+    # No welcome message to the tenant (rules_no_tenant_comms — zero automated tenant messages).
 
     new_ci = tenancy.checkin_date.strftime("%d %b %Y") if tenancy.checkin_date else "-"
     ff_note = ""

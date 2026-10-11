@@ -80,14 +80,28 @@ async def add_payment(session: AsyncSession, *, payment_date: date, name: str, a
                       payment_mode=payment_mode, notes=notes, created_by=created_by)
     session.add(row)
     await session.flush()
+    _audit(session, created_by, row, "created", None, f"{inr(amount)} {payment_date.isoformat()}")
     return row
 
 
-async def void_payment(session: AsyncSession, row_id: int) -> ChitPayment | None:
+def _audit(session: AsyncSession, by: str | None, row: ChitPayment, field: str, old, new) -> None:
+    """Every chit write lands in audit_log (rules_audit_logs) — the register is money."""
+    from src.database.models import AuditLog
+    session.add(AuditLog(changed_by=by or "system", entity_type="chit_payment", entity_id=row.id,
+                         entity_name=row.name, field=field,
+                         old_value=None if old is None else str(old)[:500],
+                         new_value=None if new is None else str(new)[:500],
+                         source="whatsapp" if by else "system"))
+
+
+async def void_payment(session: AsyncSession, row_id: int, voided_by: str | None = None) -> ChitPayment | None:
     row = await session.get(ChitPayment, row_id)
     if not row or row.is_void:
         return None
     row.is_void = True
+    # Not "is_void": the PWA activity feed shows every is_void row as a tenant
+    # "Payment voided" to all staff — chits are Kiran + Prabhakaran only.
+    _audit(session, voided_by, row, "chit.void", "False", "True")
     await session.flush()
     return row
 
@@ -210,5 +224,6 @@ async def edit_payment(session: AsyncSession, row_id: int, *, payment_date: date
     if changes:
         stamp = f"edited {date.today()} by {edited_by or '?'}: " + ", ".join(changes)
         row.notes = f"{row.notes} | {stamp}" if row.notes else stamp
+        _audit(session, edited_by, row, "edited", None, ", ".join(changes))
         await session.flush()
     return row, changes

@@ -59,7 +59,47 @@ Bot exposes internal errors, VPS details, Python tracebacks, or DB seed errors t
 
 ---
 
-## Test Hierarchy — When to Run What
+## Sandbox end-to-end suite — the current gate (since 2026-10-11)
+
+Real app, real handlers, **local Postgres with synthetic data**; WhatsApp / Google /
+Supabase / paid LLM calls are blocked and recorded (`tests/sandbox/outbound.jsonl`).
+Setup + commands: [`tests/sandbox/README.md`](../../tests/sandbox/README.md).
+
+```bash
+venv/Scripts/python tests/sandbox/check_intents.py          # offline regex guard, seconds
+PG_BIN=... TESTBASE=... bash tests/sandbox/run_all.sh       # cold (DB reset) + repeat, all areas
+```
+
+**Cold** = DB restored to the test baseline first. **Repeat** = same cases again on the
+mutated state — catches stale pending state and non-idempotent writes. Both must be 100%
+before merging to master.
+
+| Area (`tests/sandbox/cases/`) | Cases | Cold 2026-10-11 | Repeat |
+|---|---|---|---|
+| `queries.json` — vacant/occupancy/layout/notices/check-ins/master data/activity | 107 | 107/107 | 107/107 |
+| `gate.json` — blocked numbers silent, 18 finance intents blocked × 4 staff phones | 128 | 128/128 | 128/128 |
+| `edits.json` — transfers, assign, rent/phone/gender/sharing, notes, blacklist, audit | 89 | 89/89 | 89/89 |
+| `lifecycle.json` — onboarding, arrival, check-in edits, checkout, notices | 95 | 95/95 | 95/95 |
+| `ops.json` — staff, complaints, contacts, wifi, vacation, menus, chit | 55 | 55/55 | 55/55 |
+| `test_gate_webhook.py` — signed Meta webhook: text/image/doc/audio, bank upload | 35 | 35/35 | 35/35 |
+
+Before the 2026-10-11 fixes, cold pass rates were edits 22/89 and lifecycle 38/95.
+LLM-only phrasings are tagged `llm_only` and excluded (LLM APIs are blocked in the
+sandbox for cost; regex covers every listed phrasing). Offline unit tests:
+`pytest tests/test_dues_logic.py tests/test_name_match.py tests/test_cash_logic.py`
+(32 pass); 67 older pytest failures in `*_comprehensive`/`edge_cases` etc. are stale
+tests, unchanged by this work.
+
+**Gotchas:** cases look up fixture tenants by their unique phone (`90000090xx`), never by
+tenancy id — ids shift whenever the baseline is rebuilt. `pending_actions` is keyed by
+phone, so never run two areas concurrently against one DB with the same staff phones.
+
+---
+
+## Test Hierarchy — When to Run What (LEGACY — out of date)
+
+> The golden suite below is **not** a working gate: last results 50/105 (7 Aug 2026),
+> and `eval_golden.py` targets the production DB via `.env`. Use the sandbox suite above.
 
 | Level | Command | When | Pass Target | Blocks Deploy? |
 |-------|---------|------|-------------|---------------|

@@ -8,23 +8,23 @@ Complete reference for all intents, role-based routing, pending state machine, a
 
 | Intent | Example Messages | Handler | Role | What It Does |
 |--------|------------------|---------|------|--------------|
-| PAYMENT_LOG | "Raj paid 15000 upi", "Raj paied 15000" | account_handler | owner | Log rent payment |
-| QUERY_DUES | "who owes", "pending dues", "dues" | account_handler | owner | List tenants with outstanding dues |
-| QUERY_TENANT | "Raj balance", "room 203 balance" | account_handler | owner | Tenant account: rent, paid, balance, history |
-| ADD_EXPENSE | "electricity 5000 upi" | account_handler | owner | Log operational expense |
-| QUERY_EXPENSES | "total expenses" | account_handler | owner | Expense breakdown by category/month |
-| REPORT | "monthly report", "march report" | account_handler | owner | Monthly financial report |
-| RENT_CHANGE | "change rent for Raj to 20000" | account_handler | owner | Update tenant rent |
-| RENT_DISCOUNT | "concession 2000 for Raj" | account_handler | owner | Apply one-time discount |
-| VOID_PAYMENT | "void 15000 payment" | account_handler | owner | Mark payment as void |
-| VOID_EXPENSE | "void electricity expense" | account_handler | owner | Mark expense as void |
-| DEPOSIT_CHANGE | "update deposit for Raj to 50000" | account_handler | owner | Update security deposit |
-| ADD_REFUND | "return deposit 50000 to Raj" | account_handler | owner | Initiate deposit refund |
-| QUERY_REFUNDS | "pending refunds" | account_handler | owner | List refunds |
-| BANK_REPORT | "bank report March" | finance_handler | owner | Parse bank statement → P&L |
-| BANK_DEPOSIT_MATCH | "match deposits" | finance_handler | owner | Match bank deposits to payments |
-| QUERY_UNIT_ECONOMICS | "unit economics", "revenue per bed", "cost per bed", "avg rent", "collection rate" | account_handler | owner | Per-bed KPIs: True Revenue, OPEX, EBITDA per bed, avg rent, occupancy, collection rate |
-| DASHBOARD_SUMMARY | "show dashboard", "dashboard summary", "all stats" | account_handler | owner | All 6 dashboard rows: occupancy, buildings, collection, status, notice, deposits |
+| PAYMENT_LOG | "Raj paid 15000 upi", "Raj paied 15000" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Log rent payment |
+| QUERY_DUES | "who owes", "pending dues", "dues" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: List tenants with outstanding dues |
+| QUERY_TENANT | "Raj balance", "room 203 balance" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Tenant account: rent, paid, balance, history |
+| ADD_EXPENSE | "electricity 5000 upi" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Log operational expense |
+| QUERY_EXPENSES | "total expenses" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Expense breakdown by category/month |
+| REPORT | "monthly report", "march report" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Monthly financial report |
+| RENT_CHANGE | "change rent for Raj to 20000" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Update tenant rent |
+| RENT_DISCOUNT | "concession 2000 for Raj" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Apply one-time discount |
+| VOID_PAYMENT | "void 15000 payment" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Mark payment as void |
+| VOID_EXPENSE | "void electricity expense" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Mark expense as void |
+| DEPOSIT_CHANGE | "update deposit for Raj to 50000" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Update security deposit |
+| ADD_REFUND | "return deposit 50000 to Raj" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Initiate deposit refund |
+| QUERY_REFUNDS | "pending refunds" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: List refunds |
+| BANK_REPORT | "bank report March" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Parse bank statement → P&L |
+| BANK_DEPOSIT_MATCH | "match deposits" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Match bank deposits to payments |
+| QUERY_UNIT_ECONOMICS | "unit economics", "revenue per bed", "cost per bed", "avg rent", "collection rate" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: Per-bed KPIs: True Revenue, OPEX, EBITDA per bed, avg rent, occupancy, collection rate |
+| DASHBOARD_SUMMARY | "show dashboard", "dashboard summary", "all stats" | — (gatekeeper) | all staff | **APP ONLY — blocked on WhatsApp** (security decision 25 May 2026; reply: use the Kozzy app). Was: All 6 dashboard rows: occupancy, buildings, collection, status, notice, deposits |
 | SHOW_MASTER_DATA | "show master data", "bed count summary" | owner_handler | owner | Live DB snapshot: staff rooms + revenue beds per property |
 | ADD_TENANT | "add tenant Raj", "new check-in" | owner_handler | owner | New tenant onboarding |
 | CHECKOUT | "checkout Raj" | owner_handler | owner | Initiate checkout + settlement |
@@ -32,7 +32,7 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | RECORD_CHECKOUT | "record checkout Raj" | owner_handler | owner | Mark checkout complete |
 | UPDATE_CHECKIN | "Raj checkin was 15th March" | owner_handler | owner | Correct check-in date |
 | NOTICE_GIVEN | "Raj gave notice" | owner_handler | owner | Record notice to vacate |
-| ADD_PARTNER | "add admin +919876543210" | owner_handler | owner | Add authorized user |
+| ADD_PARTNER | "add partner +91...", "give access" | owner_handler | owner | Honest reply only: bot access is the hardcoded allowlist in `role_service.py` — not changeable from chat (non-admin: refused) |
 | ROOM_TRANSFER | "move Raj to room 301" | owner_handler | owner | Transfer tenant to different room |
 | ROOM_LAYOUT | "floor plan THOR" | owner_handler | owner | Show room diagram |
 | ROOM_STATUS | "who is in room 203" | owner_handler | owner | Room occupancy details |
@@ -41,26 +41,30 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | QUERY_EXPIRING | "who is leaving this month" | owner_handler | owner | Upcoming checkouts |
 | QUERY_CHECKINS | "new arrivals" | owner_handler | owner | Recent check-ins |
 | QUERY_CHECKOUTS | "who left" | owner_handler | owner | Recent checkouts |
-| LOG_VACATION | "Raj vacation 5 days" | owner_handler | owner | Log temporary absence |
-| SEND_REMINDER_ALL | "send reminder all" | owner_handler | owner | Mass due reminder to all tenants |
+| LOG_VACATION | "Raj vacation from 15 Oct to 20 Oct", "Lokesh on leave from 15 oct to 18 oct" | owner_handler | owner | Tenant → `vacations` row (rent unchanged); Lokesh/Dilip (`operations.VACATION_EMPLOYEES`) → `operational_logs` vacation. Dates must be in the message; duplicates not re-logged; audit_log written |
+| SEND_REMINDER_ALL | "send reminder all", "remind unpaid" | owner_handler | owner | **Disabled by rule (no automated tenant comms).** Replies that reminders are off; nothing queued or sent |
 | START_ONBOARDING | "start onboarding Raj" | owner_handler | owner | Begin tenant form |
-| GET_WIFI_PASSWORD | "wifi password" | owner/tenant/lead | all | WiFi credentials |
-| SET_WIFI | "set wifi ssid PASSWORD123" | owner_handler | owner | Update WiFi |
-| COMPLAINT_REGISTER | "AC not working room 203" | owner/tenant | owner+tenant | Register complaint |
-| COMPLAINT_UPDATE | "resolve CMP-001" | owner_handler | owner | Update complaint status |
+| GET_WIFI_PASSWORD | "wifi password", "wifi password hulk floor 2", "net ka password batao" | owner_handler | owner (tenants/leads get no reply) | WiFi credentials |
+| SET_WIFI | "update wifi thor Cozeevo T2 password newpass1" | owner_handler | owner | Change one network's password in `properties.wifi_floor_map`; audit_log written |
+| COMPLAINT_REGISTER | "no water room 512", "512 tap leaking" | owner_handler | owner | Register complaint against the room's active tenancy (dedup per category); audit_log written |
+| COMPLAINT_UPDATE | "resolve complaint 512", "resolve PLU-20261011-001", "resolve complaint #5" | owner_handler | owner | Resolve by ticket / #id / room (room before bare id; asks if the room has 2+ open). No reference → lists open complaints, closes nothing. audit_log written |
 | QUERY_COMPLAINTS | "show complaints" | owner_handler | owner | List open complaints |
-| QUERY_CONTACTS | "plumber contact" | owner_handler | owner | Vendor/supplier contacts |
+| QUERY_CONTACTS | "plumber contact", "plumber kaun hai", "Ravi number" | owner_handler | owner | Vendor/supplier contacts |
+| UPDATE_CONTACT | "update contact Ravi", "edit vendor Ravi" | owner_handler | owner | Change a vendor's phone/notes (confirm; audit_log) |
+| ADD_STAFF | "add staff Raju \| Security \| 8000 \| 15-06-1990 \| ... \| room G05", "add staff Raju" | update_handler | owner | Register staff (no duplicate active name) → KYC photo or skip |
+| ASSIGN_STAFF_ROOM | "staff Raju room G05", "move staff Raju to 702", "staff raju 702 mein" | update_handler | owner | Link staff to a room; room flips to staff room |
+| EXIT_STAFF | "staff Raju exit", "staff Raju left" | update_handler | owner | Staff exited; last staff out flips room back to revenue |
 | ACTIVITY_LOG | "log plumber visit" | owner_handler | owner | Record operational activity |
 | QUERY_ACTIVITY | "activity today" | owner_handler | owner | Show activity timeline |
 | ADD_CONTACT | "add plumber Raju 9876543210" | owner_handler | owner | Save vendor/service contact |
 | GET_TENANT_NOTES | "notes for Raj" | owner_handler | owner | View tenant agreement notes |
-| REMINDER_SET | "remind me tomorrow" | owner_handler | owner | Set a reminder |
-| REQUEST_RECEIPT | "receipt for Raj" | owner_handler | owner | Generate payment receipt |
-| ROOM_TYPE | "what type is room 203" | owner_handler | owner | Room sharing type info |
-| VACATION_NOTICE | "Raj going home 5 days" | owner_handler | owner | Record planned absence |
-| MORE_MENU | "more options" | all handlers | all | Extended menu |
+| REMINDER_SET | "remind Raj tomorrow" | owner_handler | owner | **Disabled by rule (no scheduled messages).** Replies that reminders are off; nothing set |
+| REQUEST_RECEIPT | "receipt for Raj" | tenant/lead handler | tenant/lead | Generate payment receipt (DISABLED — tenants/leads get no reply) |
+| ROOM_TYPE | "what type is room 203" | tenant/lead handler | tenant/lead | Room sharing type info (DISABLED — tenants/leads get no reply) |
+| VACATION_NOTICE | "Raj going home 5 days" | tenant/lead handler | tenant/lead | Record planned absence (DISABLED — tenants/leads get no reply) |
+| MORE_MENU | "more", "more options", "full menu" | owner_handler | admin/owner/receptionist | Same role-aware WhatsApp menu as HELP (`owner_handler._ops_menu`) |
 | RULES | "house rules" | all handlers | all | PG house rules |
-| HELP | "help", "menu" | all handlers | all | Role-specific menu |
+| HELP | "help", "menu", "hi" | owner_handler | admin/owner/receptionist | Role-aware menu of commands that work on WhatsApp only; chit block only for CHIT_PHONES; ends with the Kozzy-app line |
 | UPDATE_TENANT_NOTES | "update agreement for Raj" | owner_handler | owner | Edit permanent tenant notes |
 | CHIT_LOG | "paid boobalan chit 5.5L on 11 sep", "chit belandur 5L" | chit_handler | **Kiran + Prabhakaran phones only** | Record a chit / hand-loan instalment (`chit_payments`). Name fuzzy-matched to known names; "loan" → category Loan; bank/upi → mode bank; date defaults today |
 | CHIT_QUERY | "chit payments", "chit sep", "chit boobalan", "chit summary" | chit_handler | **Kiran + Prabhakaran phones only** | List instalments, filter by month / name, totals by name |
@@ -74,9 +78,11 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | AVAILABILITY | "available rooms" | lead_handler | lead | Availability (DISABLED) |
 | VISIT_REQUEST | "can I visit" | lead_handler | lead | Book visit (DISABLED) |
 
-**Note:** Tenant and lead intents currently return `None` (no auto-reply). Messages are logged but bot stays silent.
+**Note:** Tenant and lead intents return `None` (no auto-reply) — rule: zero automated tenant comms. Messages are logged but the bot stays silent.
 
-**"owner" role** = admin, power_user, key_user, receptionist (receptionist blocked from REPORT, BANK_REPORT, BANK_DEPOSIT_MATCH)
+**All `FINANCIAL_INTENTS`** (`account_handler.FINANCIAL_INTENTS`) are blocked in `gatekeeper.py` for every role and answered with "use the Kozzy app" — payments, dues, expenses, reports, refunds, deposits all live in the app. Their rows above are kept to show where each moved.
+
+**"owner" column** = any staff phone: admin, owner, receptionist (`role_service._HARDCODED_ROLES`). Receptionist reaches every non-finance intent except ADD_PARTNER (admin only) and CHIT_* (Kiran + Prabhakaran phones only).
 
 ---
 
@@ -87,14 +93,13 @@ Complete reference for all intents, role-based routing, pending state machine, a
 ```
 Normalize phone → 10-digit
     ↓
-Rate limit check (10/10min, 50/day)
-    ↓ FAIL → role = "blocked"
-Check authorized_users table → admin / power_user / key_user / receptionist
+Hardcoded allowlist (_HARDCODED_ROLES; DEMO_ROLES when DEMO_MODE=1)
+    → admin / owner / receptionist
     ↓ NOT FOUND
-Check tenants table → tenant
-    ↓ NOT FOUND
-Default → lead
+role = "blocked" → no reply (tenants, leads, unknown numbers)
 ```
+
+Partners / staff cannot be added from chat — edit `_HARDCODED_ROLES` and deploy.
 
 Returns `CallerContext` with: phone, role, name, tenant_id, auth_user_id, is_blocked
 
@@ -102,14 +107,14 @@ Returns `CallerContext` with: phone, role, name, tenant_id, auth_user_id, is_blo
 
 ## 3. Per-Role Flows
 
-### Admin / Power User / Key User
+### Admin / Owner
 
 ```
 Message → Rate Limit → Role Detection → Intent Detection (regex 97%)
     ↓
 [Gatekeeper]
     CHIT_* intent → phone in services/chit_payments.CHIT_PHONES? → chit_handler, else generic UNKNOWN reply (hard boundary, role is NOT enough)
-    Financial intent → account_handler
+    Financial intent → "use the Kozzy app" (blocked, every role)
     Operational intent → owner_handler
     ↓
 [Handler]
@@ -122,7 +127,7 @@ Message → Rate Limit → Role Detection → Intent Detection (regex 97%)
 
 ### Receptionist
 
-Same as admin BUT blocked from: REPORT, BANK_REPORT, BANK_DEPOSIT_MATCH
+Same as admin/owner (finance is blocked for everyone), except ADD_PARTNER is refused and CHIT_* gets the generic "didn't understand" reply.
 
 ### Tenant (DISABLED)
 
@@ -155,7 +160,7 @@ Bot returns `None` → no reply sent. Message logged to `chat_messages`.
 - **Auto-expiry**: All pending actions expire after 30 minutes
 - **Learning**: When user picks from ambiguous list, pattern→intent saved to `learned_rules.json`
 
-### Mid-Flow Corrections (v1.12)
+### Mid-Flow Corrections (v1.12) — historical (payment logging is app-only now)
 
 During CONFIRM_PAYMENT_LOG, users can correct details instead of just yes/no:
 
@@ -259,7 +264,9 @@ Sheet writes are async and non-blocking. Sheet errors don't prevent payment logg
 
 ---
 
-## 9. Example Flow: "Raj paid 15000 upi"
+## 9. Example Flow: "Raj paid 15000 upi" — HISTORICAL
+
+> Today this message gets "Finance queries are not available via WhatsApp — use the Kozzy app". Kept as a record of the old flow; the payment logic now runs from the app.
 
 ```
 1. Rate limit → Pass

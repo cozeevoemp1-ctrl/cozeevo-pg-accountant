@@ -59,7 +59,20 @@ async def add_to_blacklist(
     result = await session.execute(
         sql, {"name": name or None, "phone": phone or None, "reason": reason, "added_by": added_by}
     )
-    return result.scalar_one()
+    new_id = result.scalar_one()
+    _audit(session, new_id, name or phone, "added", added_by, reason)
+    return new_id
+
+
+def _audit(session: AsyncSession, bl_id: int, who: str | None, action: str,
+           actor: str | None, note: str | None = None) -> None:
+    """Every blacklist write lands in audit_log (rules_audit_logs)."""
+    from src.database.models import AuditLog
+    session.add(AuditLog(
+        changed_by=actor or "system", entity_type="blacklist", entity_id=bl_id,
+        entity_name=who, field="blacklist", old_value=None, new_value=action,
+        source="whatsapp" if (actor or "").lstrip("+").isdigit() else "pwa", note=note,
+    ))
 
 
 async def list_blacklist(session: AsyncSession) -> list[dict]:
@@ -73,11 +86,15 @@ async def list_blacklist(session: AsyncSession) -> list[dict]:
     return [dict(r._mapping) for r in rows]
 
 
-async def remove_from_blacklist(session: AsyncSession, blacklist_id: int) -> bool:
+async def remove_from_blacklist(session: AsyncSession, blacklist_id: int,
+                                removed_by: str | None = None) -> bool:
     """Soft-delete a blacklist entry. Returns True if found and removed."""
     sql = text(
         "UPDATE blacklist SET is_active = FALSE "
-        "WHERE id = :id AND is_active = TRUE RETURNING id"
+        "WHERE id = :id AND is_active = TRUE RETURNING id, name, phone"
     )
-    result = await session.execute(sql, {"id": blacklist_id})
-    return result.scalar() is not None
+    row = (await session.execute(sql, {"id": blacklist_id})).first()
+    if row is None:
+        return False
+    _audit(session, blacklist_id, row.name or row.phone, "removed", removed_by)
+    return True

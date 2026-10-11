@@ -46,11 +46,18 @@ class QuickBookRequest(BaseModel):
     notes: str = ""                 # INTERNAL: stored in onboarding_sessions.admin_notes, never sent to tenant
 
 
-@router.post("/quick-book")
-async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_user)):
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(403, "Admin or staff only")
+def onboarding_link(token: str) -> str:
+    """Tenant onboarding form link — the ONLY place it is built (BASE_URL env + /join/{token})."""
+    return f"{os.getenv('BASE_URL', 'https://api.getkozzy.com').rstrip('/')}/join/{token}"
 
+
+async def create_booking(session, req: QuickBookRequest, actor: str | None, audit_actor: str) -> dict:
+    """Validate + write a pre-booking (OnboardingSession, plus Tenant/no_show Tenancy/Payment
+    when an advance was taken). Flushes, never commits, never messages anyone — callers own
+    the transaction and decide whether the tenant is sent the form link.
+    Shared by the PWA quick-book endpoint and the WhatsApp START_ONBOARDING flow.
+    Raises HTTPException on any validation failure (detail is staff-readable).
+    """
     phone = _normalize_phone(req.tenant_phone)
     if not phone or len(phone) < 10:
         raise HTTPException(400, f"Phone must be at least 10 digits (got {len(phone) if phone else 0})")
@@ -89,248 +96,261 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         if checkout <= checkin:
             raise HTTPException(400, "checkout_date must be after checkin_date")
 
-    async with get_session() as session:
-        # Blacklist check
-        from src.services.blacklist import check_blacklisted
-        bl = await check_blacklisted(session, phone=phone)
-        if bl:
-            raise HTTPException(403, f"This person is on the Cozeevo blacklist: {bl['reason']}")
+    # Blacklist check
+    from src.services.blacklist import check_blacklisted
+    bl = await check_blacklisted(session, phone=phone)
+    if bl:
+        raise HTTPException(403, f"This person is on the Cozeevo blacklist: {bl['reason']}")
 
-        # Active tenancy check (blocks current residents)
-        from src.services.room_occupancy import get_active_tenancy_by_phone
-        existing = await get_active_tenancy_by_phone(session, phone)
-        if existing:
-            _et, _etn, _er = existing
-            raise HTTPException(409, f"This person is currently staying in Room {_er.room_number} — cannot pre-book an existing resident.")
+    # Active tenancy check (blocks current residents)
+    from src.services.room_occupancy import get_active_tenancy_by_phone
+    existing = await get_active_tenancy_by_phone(session, phone)
+    if existing:
+        _et, _etn, _er = existing
+        raise HTTPException(409, f"This person is currently staying in Room {_er.room_number} — cannot pre-book an existing resident.")
 
-        # No-show tenancy check (blocks already pre-booked tenants)
-        existing_noshow = (await session.execute(
-            select(Tenancy, Room)
-            .join(Room, Room.id == Tenancy.room_id)
-            .join(Tenant, Tenant.id == Tenancy.tenant_id)
-            .where(
-                Tenancy.status == TenancyStatus.no_show,
-                func.right(
-                    func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10
-                ) == phone[-10:],
-            )
-        )).first()
-        if existing_noshow:
-            _ns_ten, _ns_room = existing_noshow
-            ci = _ns_ten.checkin_date.strftime("%d %b %Y") if _ns_ten.checkin_date else "unknown"
-            raise HTTPException(409, f"This person is already pre-booked in Room {_ns_room.room_number} (check-in {ci}).")
+    # No-show tenancy check (blocks already pre-booked tenants)
+    existing_noshow = (await session.execute(
+        select(Tenancy, Room)
+        .join(Room, Room.id == Tenancy.room_id)
+        .join(Tenant, Tenant.id == Tenancy.tenant_id)
+        .where(
+            Tenancy.status == TenancyStatus.no_show,
+            func.right(
+                func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10
+            ) == phone[-10:],
+        )
+    )).first()
+    if existing_noshow:
+        _ns_ten, _ns_room = existing_noshow
+        ci = _ns_ten.checkin_date.strftime("%d %b %Y") if _ns_ten.checkin_date else "unknown"
+        raise HTTPException(409, f"This person is already pre-booked in Room {_ns_room.room_number} (check-in {ci}).")
 
-        # Find room
-        room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
-        if not room:
-            raise HTTPException(404, f"Room {req.room_number} not found")
+    # Find room
+    room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
+    if not room:
+        raise HTTPException(404, f"Room {req.room_number} not found")
 
-        # Reject room 000 (placeholder) — must assign a real room at booking time
-        if room.room_number == "000":
-            raise HTTPException(422, "Room 000 is a placeholder. Please select a specific room for this booking.")
+    # Reject room 000 (placeholder) — must assign a real room at booking time
+    if room.room_number == "000":
+        raise HTTPException(422, "Room 000 is a placeholder. Please select a specific room for this booking.")
 
-        # Capacity check (runs for every real room — 000 is rejected above)
-        from src.services.room_occupancy import get_room_occupants
-        occ = await get_room_occupants(session, room)
-        max_occ = room.max_occupancy or 1
-        if occ.beds_occupied(max_occ) >= max_occ:
-            # Allow pre-booking if enough beds will be free on the requested checkin_date.
-            # A bed is free if the current tenant's checkout_date < checkin_date.
-            active_rows = (await session.execute(
-                select(Tenancy.checkout_date, Tenancy.expected_checkout)
-                .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
-            )).all()
-            def _eff(row): return row.checkout_date or row.expected_checkout
-            beds_still_occupied = sum(1 for row in active_rows if _eff(row) is None or _eff(row) >= checkin)
-            if beds_still_occupied >= max_occ:
-                ends = [_eff(row) for row in active_rows if _eff(row) is not None]
-                if ends:
-                    free_from = min(ends) + timedelta(days=1)
-                    detail = (
-                        f"Room {room.room_number} is fully booked until {min(ends).strftime('%d %b %Y')}. "
-                        f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
-                    )
-                else:
-                    detail = f"Room {room.room_number} is full with no checkout dates set — cannot pre-book."
-                raise HTTPException(409, detail)
+    # Capacity check (runs for every real room — 000 is rejected above)
+    from src.services.room_occupancy import get_room_occupants
+    occ = await get_room_occupants(session, room)
+    max_occ = room.max_occupancy or 1
+    if occ.beds_occupied(max_occ) >= max_occ:
+        # Allow pre-booking if enough beds will be free on the requested checkin_date.
+        # A bed is free if the current tenant's checkout_date < checkin_date.
+        active_rows = (await session.execute(
+            select(Tenancy.checkout_date, Tenancy.expected_checkout)
+            .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
+        )).all()
+        def _eff(row): return row.checkout_date or row.expected_checkout
+        beds_still_occupied = sum(1 for row in active_rows if _eff(row) is None or _eff(row) >= checkin)
+        if beds_still_occupied >= max_occ:
+            ends = [_eff(row) for row in active_rows if _eff(row) is not None]
+            if ends:
+                free_from = min(ends) + timedelta(days=1)
+                detail = (
+                    f"Room {room.room_number} is fully booked until {min(ends).strftime('%d %b %Y')}. "
+                    f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
+                )
+            else:
+                detail = f"Room {room.room_number} is full with no checkout dates set — cannot pre-book."
+            raise HTTPException(409, detail)
 
-        # Cancel old pending sessions for the same phone
-        old = await session.execute(
-            select(OnboardingSession).where(
-                OnboardingSession.tenant_phone == phone,
-                OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
+    # Cancel old pending sessions for the same phone
+    old = await session.execute(
+        select(OnboardingSession).where(
+            OnboardingSession.tenant_phone == phone,
+            OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
+        )
+    )
+    for old_obs in old.scalars().all():
+        old_obs.status = "cancelled"
+
+    # Create session — pre-fill name in tenant_data so Bookings page shows it immediately
+    token = str(uuid.uuid4())
+    # Resolve sharing_type ONCE for all paths — never leave it NULL.
+    # Honor the explicit pick (incl. "premium" = whole room); otherwise default to
+    # the room's master type so a whole-room tenant is never silently stored as a
+    # single bed (which makes the room show a phantom free bed everywhere).
+    _sharing = (req.sharing_type or "").strip().lower()
+    if _sharing not in ("single", "double", "triple", "premium"):
+        _sharing = (room.room_type.value if room and room.room_type else None)
+    if req.stay_type == "daily":
+        obs = OnboardingSession(
+            token=token,
+            status="pending_tenant",
+            created_by_phone=actor,
+            tenant_phone=phone,
+            room_id=room.id,
+            agreed_rent=Decimal("0"),
+            daily_rate=Decimal(str(req.daily_rate)),
+            maintenance_fee=Decimal("0"),
+            security_deposit=Decimal(str(req.security_deposit)),
+            booking_amount=Decimal(str(req.booking_amount)),
+            advance_mode=req.advance_mode or "",
+            checkin_date=checkin,
+            checkout_date=checkout,
+            stay_type="daily",
+            sharing_type=_sharing,
+            tenant_data=json.dumps({"name": req.tenant_name.strip()}),
+            lock_in_months=_lock_in,
+            special_terms=_special_terms,
+            admin_notes=_admin_notes,
+            expires_at=datetime.utcnow() + timedelta(hours=48),
+        )
+    else:
+        if req.security_deposit <= 0:
+            raise HTTPException(status_code=422, detail="security_deposit is required for monthly bookings")
+        deposit = req.security_deposit
+        obs = OnboardingSession(
+            token=token,
+            status="pending_tenant",
+            created_by_phone=actor,
+            tenant_phone=phone,
+            room_id=room.id,
+            agreed_rent=Decimal(str(req.monthly_rent)),
+            maintenance_fee=Decimal(str(req.maintenance_fee)),
+            security_deposit=Decimal(str(deposit)),
+            booking_amount=Decimal(str(req.booking_amount)),
+            advance_mode=req.advance_mode or "",
+            checkin_date=checkin,
+            stay_type="monthly",
+            sharing_type=_sharing,
+            tenant_data=json.dumps({"name": req.tenant_name.strip()}),
+            lock_in_months=_lock_in,
+            special_terms=_special_terms,
+            admin_notes=_admin_notes,
+            expires_at=datetime.utcnow() + timedelta(hours=48),
+        )
+    session.add(obs)
+    await session.flush()
+
+    # If advance was collected at booking, create Tenant + no_show Tenancy + Payment immediately
+    # so it appears in payment history and activity log before check-in.
+    if req.booking_amount > 0:
+        from sqlalchemy import func as _func
+        from src.services.room_occupancy import _normalize_phone as _np
+        _norm10 = _np(phone)
+        tenant = await session.scalar(
+            select(Tenant).where(
+                _func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm10
             )
         )
-        for old_obs in old.scalars().all():
-            old_obs.status = "cancelled"
-
-        # Create session — pre-fill name in tenant_data so Bookings page shows it immediately
-        token = str(uuid.uuid4())
-        # Resolve sharing_type ONCE for all paths — never leave it NULL.
-        # Honor the explicit pick (incl. "premium" = whole room); otherwise default to
-        # the room's master type so a whole-room tenant is never silently stored as a
-        # single bed (which makes the room show a phantom free bed everywhere).
-        _sharing = (req.sharing_type or "").strip().lower()
-        if _sharing not in ("single", "double", "triple", "premium"):
-            _sharing = (room.room_type.value if room and room.room_type else None)
-        if req.stay_type == "daily":
-            obs = OnboardingSession(
-                token=token,
-                status="pending_tenant",
-                created_by_phone=user.actor,
-                tenant_phone=phone,
-                room_id=room.id,
-                agreed_rent=Decimal("0"),
-                daily_rate=Decimal(str(req.daily_rate)),
-                maintenance_fee=Decimal("0"),
-                security_deposit=Decimal(str(req.security_deposit)),
-                booking_amount=Decimal(str(req.booking_amount)),
-                advance_mode=req.advance_mode or "",
-                checkin_date=checkin,
-                checkout_date=checkout,
-                stay_type="daily",
-                sharing_type=_sharing,
-                tenant_data=json.dumps({"name": req.tenant_name.strip()}),
-                lock_in_months=_lock_in,
-                special_terms=_special_terms,
-                admin_notes=_admin_notes,
-                expires_at=datetime.utcnow() + timedelta(hours=48),
-            )
-        else:
-            if req.security_deposit <= 0:
-                raise HTTPException(status_code=422, detail="security_deposit is required for monthly bookings")
-            deposit = req.security_deposit
-            obs = OnboardingSession(
-                token=token,
-                status="pending_tenant",
-                created_by_phone=user.actor,
-                tenant_phone=phone,
-                room_id=room.id,
-                agreed_rent=Decimal(str(req.monthly_rent)),
-                maintenance_fee=Decimal(str(req.maintenance_fee)),
-                security_deposit=Decimal(str(deposit)),
-                booking_amount=Decimal(str(req.booking_amount)),
-                advance_mode=req.advance_mode or "",
-                checkin_date=checkin,
-                stay_type="monthly",
-                sharing_type=_sharing,
-                tenant_data=json.dumps({"name": req.tenant_name.strip()}),
-                lock_in_months=_lock_in,
-                special_terms=_special_terms,
-                admin_notes=_admin_notes,
-                expires_at=datetime.utcnow() + timedelta(hours=48),
-            )
-        session.add(obs)
-        await session.flush()
-
-        # If advance was collected at booking, create Tenant + no_show Tenancy + Payment immediately
-        # so it appears in payment history and activity log before check-in.
-        if req.booking_amount > 0:
-            from sqlalchemy import func as _func
-            from src.services.room_occupancy import _normalize_phone as _np
-            _norm10 = _np(phone)
-            tenant = await session.scalar(
-                select(Tenant).where(
-                    _func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm10
-                )
-            )
-            if not tenant:
-                tenant = Tenant(name=req.tenant_name.strip(), phone=phone)
-                session.add(tenant)
-                await session.flush()
-
-            # Block duplicate: same tenant + same room + overlapping dates.
-            # A repeat stay on different dates is fine (new tenancy id); only an
-            # overlapping second booking for the same person+room is rejected.
-            _dup = await find_overlapping_tenancy(session, tenant.id, room.id, checkin, checkout)
-            if _dup:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"{req.tenant_name.strip()} already has a booking in Room "
-                        f"{room.room_number} overlapping these dates (booking #{_dup.id}). "
-                        f"For a repeat stay use different dates."
-                    ),
-                )
-
-            _stay = StayType.daily if req.stay_type == "daily" else StayType.monthly
-            # Always create as no_show — only transition to active when admin approves via Bookings page
-            _target_status = TenancyStatus.no_show
-            tenancy = Tenancy(
-                tenant_id=tenant.id,
-                room_id=room.id,
-                stay_type=_stay,
-                status=_target_status,
-                sharing_type=SharingType(_sharing) if _sharing else None,
-                checkin_date=checkin,
-                checkout_date=checkout,
-                agreed_rent=req.monthly_rent if req.stay_type == "monthly" else Decimal(str(req.daily_rate)),  # daily: agreed_rent holds per-day rate (canonical convention; see onboarding_router check-in)
-                security_deposit=req.security_deposit,
-                booking_amount=Decimal(str(req.booking_amount)),
-                maintenance_fee=req.maintenance_fee if req.stay_type == "monthly" else 0,
-                entered_by="quick_book",
-            )
-            session.add(tenancy)
+        if not tenant:
+            tenant = Tenant(name=req.tenant_name.strip(), phone=phone)
+            session.add(tenant)
             await session.flush()
 
-            _mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
-            # Same hash recipe as log_payment (services/payments.py) so the
-            # uq_payment_unique_hash partial index blocks a double-submitted
-            # advance — this raw insert was the only unguarded Payment writer
-            # on the PWA path (audit 2026-08-06 §5).
-            import hashlib as _hashlib
-            _amount_dec = Decimal(str(req.booking_amount))
-            _hash_raw = f"{tenancy.id}:{date.today()}:{_amount_dec}:{_mode.value}::{PaymentFor.booking.value}"
-            _pmt = Payment(
-                tenancy_id=tenancy.id,
-                amount=_amount_dec,
-                # Money is in hand NOW — stamping the future check-in date put the
-                # advance in the wrong month's collection and made the receipt read
-                # like a payment that hasn't happened yet.
-                payment_date=date.today(),
-                payment_mode=_mode,
-                for_type=PaymentFor.booking,
-                notes=f"Advance collected at pre-booking ({req.advance_mode or 'cash'})",
-                unique_hash=_hashlib.md5(_hash_raw.encode()).hexdigest(),
-            )
-            session.add(_pmt)
-            try:
-                await session.flush()  # need _pmt.id for audit entry
-            except Exception as _exc:
-                if "unique_hash" in str(_exc):
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Advance already recorded for this booking today (duplicate submit).",
-                    ) from _exc
-                raise
-
-            from src.services.audit import write_audit_entry as _wae
-            await _wae(
-                session=session,
-                changed_by=user.actor or str(user.user_id),
-                entity_type="payment", entity_id=_pmt.id,
-                field="payment.log",
-                new_value=str(float(req.booking_amount)),
-                entity_name=req.tenant_name.strip(),
-                room_number=room.room_number,
-                source="pwa",
-                note=f"Advance ₹{int(req.booking_amount):,} {'upi' if req.advance_mode == 'upi' else 'cash'} — pre-booking",
+        # Block duplicate: same tenant + same room + overlapping dates.
+        # A repeat stay on different dates is fine (new tenancy id); only an
+        # overlapping second booking for the same person+room is rejected.
+        _dup = await find_overlapping_tenancy(session, tenant.id, room.id, checkin, checkout)
+        if _dup:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{req.tenant_name.strip()} already has a booking in Room "
+                    f"{room.room_number} overlapping these dates (booking #{_dup.id}). "
+                    f"For a repeat stay use different dates."
+                ),
             )
 
-            obs.tenant_id = tenant.id
-            obs.tenancy_id = tenancy.id
+        _stay = StayType.daily if req.stay_type == "daily" else StayType.monthly
+        # Always create as no_show — only transition to active when admin approves via Bookings page
+        _target_status = TenancyStatus.no_show
+        tenancy = Tenancy(
+            tenant_id=tenant.id,
+            room_id=room.id,
+            stay_type=_stay,
+            status=_target_status,
+            sharing_type=SharingType(_sharing) if _sharing else None,
+            checkin_date=checkin,
+            checkout_date=checkout,
+            agreed_rent=req.monthly_rent if req.stay_type == "monthly" else Decimal(str(req.daily_rate)),  # daily: agreed_rent holds per-day rate (canonical convention; see onboarding_router check-in)
+            security_deposit=req.security_deposit,
+            booking_amount=Decimal(str(req.booking_amount)),
+            maintenance_fee=req.maintenance_fee if req.stay_type == "monthly" else 0,
+            entered_by="quick_book",
+        )
+        session.add(tenancy)
+        await session.flush()
 
-        # Building name for WhatsApp message
-        building = ""
-        if room.property_id:
-            prop = await session.get(Property, room.property_id)
-            building = prop.name if prop else ""
+        _mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
+        # Same hash recipe as log_payment (services/payments.py) so the
+        # uq_payment_unique_hash partial index blocks a double-submitted
+        # advance — this raw insert was the only unguarded Payment writer
+        # on the PWA path (audit 2026-08-06 §5).
+        import hashlib as _hashlib
+        _amount_dec = Decimal(str(req.booking_amount))
+        _hash_raw = f"{tenancy.id}:{date.today()}:{_amount_dec}:{_mode.value}::{PaymentFor.booking.value}"
+        _pmt = Payment(
+            tenancy_id=tenancy.id,
+            amount=_amount_dec,
+            # Money is in hand NOW — stamping the future check-in date put the
+            # advance in the wrong month's collection and made the receipt read
+            # like a payment that hasn't happened yet.
+            payment_date=date.today(),
+            payment_mode=_mode,
+            for_type=PaymentFor.booking,
+            notes=f"Advance collected at pre-booking ({req.advance_mode or 'cash'})",
+            unique_hash=_hashlib.md5(_hash_raw.encode()).hexdigest(),
+        )
+        session.add(_pmt)
+        try:
+            await session.flush()  # need _pmt.id for audit entry
+        except Exception as _exc:
+            if "unique_hash" in str(_exc):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Advance already recorded for this booking today (duplicate submit).",
+                ) from _exc
+            raise
 
+        from src.services.audit import write_audit_entry as _wae
+        await _wae(
+            session=session,
+            changed_by=audit_actor,
+            entity_type="payment", entity_id=_pmt.id,
+            field="payment.log",
+            new_value=str(float(req.booking_amount)),
+            entity_name=req.tenant_name.strip(),
+            room_number=room.room_number,
+            source="pwa",
+            note=f"Advance ₹{int(req.booking_amount):,} {'upi' if req.advance_mode == 'upi' else 'cash'} — pre-booking",
+        )
+
+        obs.tenant_id = tenant.id
+        obs.tenancy_id = tenancy.id
+
+    # Building name for WhatsApp message
+    building = ""
+    if room.property_id:
+        prop = await session.get(Property, room.property_id)
+        building = prop.name if prop else ""
+
+    return {"obs": obs, "room": room, "building": building,
+            "phone": phone, "checkin": checkin, "checkout": checkout}
+
+
+@router.post("/quick-book")
+async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_user)):
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(403, "Admin or staff only")
+
+    async with get_session() as session:
+        booked = await create_booking(session, req, actor=user.actor,
+                                      audit_actor=user.actor or str(user.user_id))
+        obs, room, building = booked["obs"], booked["room"], booked["building"]
+        phone, checkin, checkout = booked["phone"], booked["checkin"], booked["checkout"]
+        token = obs.token
         await session.commit()
 
         # Send WhatsApp (template first, fall back to freeform)
-        base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-        onboard_link = f"{base_url}/join/{token}"
+        onboard_link = onboarding_link(token)
         whatsapp_sent = False
         phone_wa = f"91{phone}"
         try:

@@ -1,5 +1,44 @@
 # Changelog
 
+## Session AW — 2026-10-11 — WhatsApp bot end-to-end audit + fixes, sandbox test suite
+
+- **Sandbox E2E suite** (`tests/sandbox/`): real app against local Postgres with synthetic
+  data; Meta/Google/Supabase/paid-LLM calls blocked and recorded. 474 conversation cases +
+  35 signed-webhook tests, **100% cold and repeat** (`run_all.sh`). Before fixes: edits
+  22/89, lifecycle 38/95. `docs/operations/TESTING.md` now points here; the golden suite
+  is marked legacy (it was 50/105 and runs against prod).
+- **Data-safety fixes**: a wrong surname resolved to the only tenant with that first name
+  and acted silently ("move Zorawar Qwertyuiop" moved Zorawar Bedi) — one
+  `_shared.surname_resembles()` now guards name lookup, assign-room, arrival and day-stay
+  search. ASSIGN_ROOM created duplicate ₹0 tenancies. Room moves could double-book
+  (premium rooms, bookings, overdue exits) — `check_transfer_destination()` in
+  `services/room_transfer.py` (PWA too). Gender change wrote nothing. Changing an active
+  tenant's checkout date wrote `checkout_date`. "checkout X on 5 Oct" exited today.
+  "Close complaint" closed the newest complaint anywhere.
+- **Bed counts single-sourced**: `occupancy.get_bed_breakdown()` — bot occupancy / vacant
+  rooms / beds-free-tonight / master data and the PWA KPI tile disagreed (no-shows in full
+  rooms). Over-capacity bookings are now flagged. PWA tile number changes where they existed.
+- **Flows that never worked now complete**: START_ONBOARDING (crashed; now gives staff the
+  `/join/{token}` link via shared `bookings.create_booking()`), CHECKIN_ARRIVAL (lost
+  pending), RECEIPT_CONFIRM, LOG_VACATION (stub), RECORD_CHECKOUT.
+- **Honest replies**: HELP/menus list only what works on WhatsApp (finance → Kozzy app);
+  "remind all", "set reminder", "add partner" no longer fake success; image/receipt
+  flows no longer instruct blocked commands.
+- **Gate**: blocked numbers no longer get approve/reject, voice-failure or "admins only"
+  replies, and their voice notes are no longer transcribed (cost). Agent mode can no
+  longer bypass the finance block.
+- **Audit rows** added for checkout, notices, check-in/checkout date edits, blacklist,
+  complaints, contacts, wifi, chit (chit void uses `chit.void`, kept out of the staff feed).
+- Rent change via bot now runs `recalc_checkin_month_rs` (monthly only); room-transfer
+  first month uses the canonical recalc instead of a `min()` that dropped the deposit.
+- Dead `llama-3.3-70b-versatile` removed — `claude_client.groq_model()` reads `GROQ_MODEL`.
+- **Tenant messages removed pending Kiran's decision**: checkout confirmation (bot + PWA)
+  and arrival welcome. `rules_no_tenant_comms` allows staff-triggered messages — restore
+  if Kiran confirms.
+- Anthropic API returned "credit balance too low" during testing — receipt vision and
+  Haiku fallback are down in production until topped up.
+- Not deployed: on `development` only.
+
 ## Session AV — 2026-10-06 — Backdated check-ins, NA rent rows, deploy queue
 
 - **Room 121 (Mopuri Adithya Reddy, check-in 21 Sep)** couldn't be checked in: the

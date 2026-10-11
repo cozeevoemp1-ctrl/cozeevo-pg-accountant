@@ -17,6 +17,8 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
+from src.llm_gateway.claude_client import groq_model, groq_payload_extras
+
 # ── Schema context for the LLM ──────────────────────────────────────────────
 
 DB_SCHEMA = """
@@ -279,7 +281,8 @@ RULES:
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": "llama-3.3-70b-versatile",
+                    "model": groq_model(),
+                    **groq_payload_extras(),
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": question},
@@ -396,7 +399,8 @@ RULES:
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": "llama-3.3-70b-versatile",
+                    "model": groq_model(),
+                    **groq_payload_extras(),
                     "messages": [
                         {"role": "system", "content": format_prompt},
                         {"role": "user", "content": question},

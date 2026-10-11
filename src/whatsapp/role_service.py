@@ -105,6 +105,15 @@ class CallerContext:
     is_blocked:   bool = False
 
 
+def is_allowlisted(phone: str) -> bool:
+    """True if this phone may get ANY bot reply (same allowlist as get_caller_context).
+
+    Sync + DB-free so pre-pipeline branches (webhook media handling) can gate
+    on it before doing work or replying — blocked numbers must get silence.
+    """
+    return _normalize(phone) in _active_roles()
+
+
 async def get_caller_context(phone: str, session: AsyncSession) -> CallerContext:
     """
     Gate check: hardcoded allowlist only.

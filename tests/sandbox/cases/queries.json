@@ -1,0 +1,1422 @@
+{
+  "area": "queries",
+  "cases": [
+    {
+      "id": "Q-001",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "plain",
+      "turns": [
+        {
+          "msg": "vacant rooms",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_regex": "Empty Beds: \\d+\\*\\s+\\|\\s+Occupied: \\d+.*/\\s+\\d+"
+        }
+      ],
+      "expect_outbound": 0
+    },
+    {
+      "id": "Q-002",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "empty beds",
+      "turns": [
+        {
+          "msg": "empty beds",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds",
+            "THOR",
+            "HULK"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-003",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "question form",
+      "turns": [
+        {
+          "msg": "any rooms available?",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-004",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "typo",
+      "turns": [
+        {
+          "msg": "vacnt rooms",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-005",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "hinglish",
+      "turns": [
+        {
+          "msg": "khali rooms batao",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-006",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "how many empty",
+      "turns": [
+        {
+          "msg": "how many beds are empty",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-007",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "building filter hulk",
+      "turns": [
+        {
+          "msg": "hulk vacant",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "in *HULK*"
+          ],
+          "expect_not_contains": [
+            "THOR —"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-008",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "building filter thor reordered",
+      "turns": [
+        {
+          "msg": "empty beds in thor",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "in *THOR*"
+          ],
+          "expect_not_contains": [
+            "HULK —"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-009",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "gender female",
+      "turns": [
+        {
+          "msg": "female empty beds",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_any": [
+            "Beds available for Female",
+            "No rooms with a Female"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-010",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "gender male + building",
+      "turns": [
+        {
+          "msg": "room for male in hulk",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_any": [
+            "Beds available for Male in HULK",
+            "No rooms with a Male"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-011",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "receptionist",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "which beds are free",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-012",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "owner lakshmi",
+      "phone": "917358341775",
+      "turns": [
+        {
+          "msg": "Vacant beds",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-020",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "plain; numbers add up",
+      "turns": [
+        {
+          "msg": "occupancy",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_regex": "Checked-in\\s+:\\s+\\d+ beds[\\s\\S]*No-show\\s+:\\s+\\d+ beds[\\s\\S]*Booked total: \\d+ / \\d+[\\s\\S]*Vacant\\s+:\\s+\\d+ beds"
+        }
+      ],
+      "expect_outbound": 0
+    },
+    {
+      "id": "Q-021",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "how full",
+      "turns": [
+        {
+          "msg": "how full are we",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy",
+            "Vacant"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-022",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "typo",
+      "turns": [
+        {
+          "msg": "ocupancy",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-023",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "how many tenants",
+      "turns": [
+        {
+          "msg": "how many tenants do we have",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-024",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "capacity",
+      "turns": [
+        {
+          "msg": "capacity",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-025",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "hinglish",
+      "turns": [
+        {
+          "msg": "kitne log hai abhi",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-026",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "receptionist, % form",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "occupancy %",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-027",
+      "intent": "QUERY_OCCUPANCY",
+      "desc": "occupied rooms",
+      "turns": [
+        {
+          "msg": "how many rooms occupied",
+          "expect_intent": "QUERY_OCCUPANCY",
+          "expect_contains": [
+            "Occupancy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-028",
+      "intent": "REPORT",
+      "desc": "occupancy report = REPORT = finance blocked (deliberate)",
+      "turns": [
+        {
+          "msg": "occupancy report",
+          "expect_intent": "REPORT",
+          "expect_contains": [
+            "Kozzy app"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-030",
+      "intent": "ROOM_STATUS",
+      "desc": "bare room",
+      "turns": [
+        {
+          "msg": "room 105",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 105"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-031",
+      "intent": "ROOM_STATUS",
+      "desc": "who is in",
+      "turns": [
+        {
+          "msg": "who is in room 320",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 320"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-032",
+      "intent": "ROOM_STATUS",
+      "desc": "status suffix",
+      "turns": [
+        {
+          "msg": "room 109 status",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 109"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-033",
+      "intent": "ROOM_STATUS",
+      "desc": "check room G-room lowercase",
+      "turns": [
+        {
+          "msg": "check room g01",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room G01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-034",
+      "intent": "ROOM_STATUS",
+      "desc": "is room vacant",
+      "turns": [
+        {
+          "msg": "is room 401 vacant",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 401"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-035",
+      "intent": "ROOM_STATUS",
+      "desc": "who stays in",
+      "turns": [
+        {
+          "msg": "who's in room 518",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 518"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-036",
+      "intent": "ROOM_STATUS",
+      "desc": "not found",
+      "turns": [
+        {
+          "msg": "room 999",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "not found"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-037",
+      "intent": "ROOM_STATUS",
+      "desc": "room 10 must not match room 105/110",
+      "turns": [
+        {
+          "msg": "room 10",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "not found"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-038",
+      "intent": "ROOM_STATUS",
+      "desc": "staff room status",
+      "turns": [
+        {
+          "msg": "status of room 701",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "701"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-039",
+      "intent": "ROOM_STATUS",
+      "desc": "receptionist",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "who lives in room 213",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 213"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-040",
+      "intent": "ROOM_LAYOUT",
+      "desc": "floor plan",
+      "turns": [
+        {
+          "msg": "floor plan",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "THOR",
+            "HULK",
+            "Total:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-041",
+      "intent": "ROOM_LAYOUT",
+      "desc": "thor layout",
+      "turns": [
+        {
+          "msg": "thor layout",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "THOR"
+          ],
+          "expect_not_contains": [
+            "HULK"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-042",
+      "intent": "ROOM_LAYOUT",
+      "desc": "hulk rooms",
+      "turns": [
+        {
+          "msg": "hulk rooms",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "HULK"
+          ],
+          "expect_not_contains": [
+            "THOR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-043",
+      "intent": "ROOM_LAYOUT",
+      "desc": "beds per floor",
+      "turns": [
+        {
+          "msg": "beds per floor",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "Floor"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-044",
+      "intent": "ROOM_LAYOUT",
+      "desc": "room layout",
+      "turns": [
+        {
+          "msg": "room layout",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "Total:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-045",
+      "intent": "ROOM_LAYOUT",
+      "desc": "show me thor rooms",
+      "turns": [
+        {
+          "msg": "show me thor rooms",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "THOR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-046",
+      "intent": "ROOM_LAYOUT",
+      "desc": "floor plan hulk reordered",
+      "turns": [
+        {
+          "msg": "floor plan of hulk",
+          "expect_intent": "ROOM_LAYOUT",
+          "expect_contains": [
+            "HULK"
+          ],
+          "expect_not_contains": [
+            "THOR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-050",
+      "intent": "QUERY_EXPIRING",
+      "desc": "leaving this month",
+      "turns": [
+        {
+          "msg": "who is leaving this month",
+          "expect_intent": "QUERY_EXPIRING",
+          "expect_any": [
+            "upcoming exit",
+            "No notices"
+          ],
+          "expect_contains": [
+            "overdue"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-051",
+      "intent": "QUERY_EXPIRING",
+      "desc": "upcoming checkouts",
+      "turns": [
+        {
+          "msg": "upcoming checkouts",
+          "expect_intent": "QUERY_EXPIRING",
+          "expect_contains": [
+            "overdue"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-052",
+      "intent": "QUERY_EXPIRING",
+      "desc": "expiring tenancies",
+      "turns": [
+        {
+          "msg": "expiring tenancies",
+          "expect_intent": "QUERY_EXPIRING"
+        }
+      ]
+    },
+    {
+      "id": "Q-053",
+      "intent": "QUERY_EXPIRING",
+      "desc": "who gave notice",
+      "turns": [
+        {
+          "msg": "who gave notice",
+          "expect_intent": "QUERY_EXPIRING"
+        }
+      ]
+    },
+    {
+      "id": "Q-054",
+      "intent": "QUERY_EXPIRING",
+      "desc": "vacating",
+      "turns": [
+        {
+          "msg": "who is vacating",
+          "expect_intent": "QUERY_EXPIRING"
+        }
+      ]
+    },
+    {
+      "id": "Q-055",
+      "intent": "QUERY_EXPIRING",
+      "desc": "hinglish",
+      "turns": [
+        {
+          "msg": "is mahine kaun ja raha",
+          "expect_intent": "QUERY_EXPIRING"
+        }
+      ]
+    },
+    {
+      "id": "Q-056",
+      "intent": "QUERY_EXPIRING",
+      "desc": "receptionist next month",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "tenants leaving next month",
+          "expect_intent": "QUERY_EXPIRING"
+        }
+      ]
+    },
+    {
+      "id": "Q-060",
+      "intent": "QUERY_ALL_NOTICES",
+      "desc": "all notices",
+      "turns": [
+        {
+          "msg": "all notices",
+          "expect_intent": "QUERY_ALL_NOTICES",
+          "expect_contains": [
+            "overdue"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-061",
+      "intent": "QUERY_ALL_NOTICES",
+      "desc": "notice summary",
+      "turns": [
+        {
+          "msg": "notice summary",
+          "expect_intent": "QUERY_ALL_NOTICES"
+        }
+      ]
+    },
+    {
+      "id": "Q-062",
+      "intent": "QUERY_ALL_NOTICES",
+      "desc": "total vacating",
+      "turns": [
+        {
+          "msg": "total vacating",
+          "expect_intent": "QUERY_ALL_NOTICES"
+        }
+      ]
+    },
+    {
+      "id": "Q-063",
+      "intent": "QUERY_ALL_NOTICES",
+      "desc": "show all notice",
+      "turns": [
+        {
+          "msg": "show all notice",
+          "expect_intent": "QUERY_ALL_NOTICES"
+        }
+      ]
+    },
+    {
+      "id": "Q-064",
+      "intent": "QUERY_ALL_NOTICES",
+      "desc": "all tenants on notice",
+      "turns": [
+        {
+          "msg": "all tenants on notice",
+          "expect_intent": "QUERY_ALL_NOTICES"
+        }
+      ]
+    },
+    {
+      "id": "Q-065",
+      "intent": "QUERY_ALL_NOTICES",
+      "desc": "total notices",
+      "turns": [
+        {
+          "msg": "total notices",
+          "expect_intent": "QUERY_ALL_NOTICES"
+        }
+      ]
+    },
+    {
+      "id": "Q-070",
+      "intent": "QUERY_CHECKINS",
+      "desc": "checkins july - July no-shows (never arrived, untouched by other cases) are NOT check-ins",
+      "turns": [
+        {
+          "msg": "checkins july",
+          "expect_intent": "QUERY_CHECKINS",
+          "expect_not_contains": [
+            "Indraneel Menon",
+            "Lakshita Pandey"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-071",
+      "intent": "QUERY_CHECKINS",
+      "desc": "new tenants this month",
+      "turns": [
+        {
+          "msg": "new tenants this month",
+          "expect_intent": "QUERY_CHECKINS"
+        }
+      ]
+    },
+    {
+      "id": "Q-072",
+      "intent": "QUERY_CHECKINS",
+      "desc": "recent checkins",
+      "turns": [
+        {
+          "msg": "recent checkins",
+          "expect_intent": "QUERY_CHECKINS"
+        }
+      ]
+    },
+    {
+      "id": "Q-073",
+      "intent": "QUERY_CHECKINS",
+      "desc": "specific month",
+      "turns": [
+        {
+          "msg": "checkins july",
+          "expect_intent": "QUERY_CHECKINS",
+          "expect_contains": [
+            "July 2026"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-074",
+      "intent": "QUERY_CHECKINS",
+      "desc": "new arrivals",
+      "turns": [
+        {
+          "msg": "new arrivals",
+          "expect_intent": "QUERY_CHECKINS"
+        }
+      ]
+    },
+    {
+      "id": "Q-075",
+      "intent": "QUERY_CHECKINS",
+      "desc": "who joined",
+      "turns": [
+        {
+          "msg": "who joined",
+          "expect_intent": "QUERY_CHECKINS"
+        }
+      ]
+    },
+    {
+      "id": "Q-076",
+      "intent": "QUERY_CHECKINS",
+      "desc": "hinglish",
+      "turns": [
+        {
+          "msg": "is mahine kaun aaya",
+          "expect_intent": "QUERY_CHECKINS"
+        }
+      ]
+    },
+    {
+      "id": "Q-080",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "who checked out",
+      "turns": [
+        {
+          "msg": "who checked out",
+          "expect_intent": "QUERY_CHECKOUTS"
+        }
+      ]
+    },
+    {
+      "id": "Q-081",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "checkouts this month",
+      "turns": [
+        {
+          "msg": "checkouts this month",
+          "expect_intent": "QUERY_CHECKOUTS"
+        }
+      ]
+    },
+    {
+      "id": "Q-082",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "who left",
+      "turns": [
+        {
+          "msg": "who left",
+          "expect_intent": "QUERY_CHECKOUTS"
+        }
+      ]
+    },
+    {
+      "id": "Q-083",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "specific month",
+      "turns": [
+        {
+          "msg": "checkouts july",
+          "expect_intent": "QUERY_CHECKOUTS",
+          "expect_contains": [
+            "July 2026"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-084",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "recent checkouts",
+      "turns": [
+        {
+          "msg": "recent checkouts",
+          "expect_intent": "QUERY_CHECKOUTS"
+        }
+      ]
+    },
+    {
+      "id": "Q-085",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "who vacated",
+      "turns": [
+        {
+          "msg": "who vacated",
+          "expect_intent": "QUERY_CHECKOUTS"
+        }
+      ]
+    },
+    {
+      "id": "Q-086",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "hinglish month",
+      "turns": [
+        {
+          "msg": "july mein kaun gaya",
+          "expect_intent": "QUERY_CHECKOUTS",
+          "expect_contains": [
+            "July 2026"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-090",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "beds free tonight",
+      "turns": [
+        {
+          "msg": "beds free tonight",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_regex": "Beds free tonight: \\d+/\\d+"
+        }
+      ]
+    },
+    {
+      "id": "Q-091",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "how many free today",
+      "turns": [
+        {
+          "msg": "how many beds free today",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_contains": [
+            "Beds free"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-092",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "day stay availability",
+      "turns": [
+        {
+          "msg": "day stay availability",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_contains": [
+            "Beds free"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-093",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "free beds for day stay",
+      "turns": [
+        {
+          "msg": "free beds for daystay",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_contains": [
+            "Beds free"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-094",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "any rooms free tonight",
+      "turns": [
+        {
+          "msg": "any rooms free tonight?",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_contains": [
+            "Beds free"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-095",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "future date",
+      "turns": [
+        {
+          "msg": "beds free on 20 oct",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_contains": [
+            "Beds free 20 Oct 2026"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-096",
+      "intent": "DAYSTAY_AVAILABILITY",
+      "desc": "receptionist",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "day stay beds available",
+          "expect_intent": "DAYSTAY_AVAILABILITY",
+          "expect_contains": [
+            "Beds free"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-100",
+      "intent": "SHOW_MASTER_DATA",
+      "desc": "show master data",
+      "turns": [
+        {
+          "msg": "show master data",
+          "expect_intent": "SHOW_MASTER_DATA",
+          "expect_regex": "Total: \\d+ rooms, \\d+ beds[\\s\\S]*Now: \\d+ checked-in · \\d+ no-show · \\d+ vacant"
+        }
+      ]
+    },
+    {
+      "id": "Q-101",
+      "intent": "SHOW_MASTER_DATA",
+      "desc": "summary",
+      "turns": [
+        {
+          "msg": "master data summary",
+          "expect_intent": "SHOW_MASTER_DATA"
+        }
+      ]
+    },
+    {
+      "id": "Q-102",
+      "intent": "SHOW_MASTER_DATA",
+      "desc": "bed count summary",
+      "turns": [
+        {
+          "msg": "bed count summary",
+          "expect_intent": "SHOW_MASTER_DATA"
+        }
+      ]
+    },
+    {
+      "id": "Q-103",
+      "intent": "SHOW_MASTER_DATA",
+      "desc": "total bed count",
+      "turns": [
+        {
+          "msg": "total bed count",
+          "expect_intent": "SHOW_MASTER_DATA"
+        }
+      ]
+    },
+    {
+      "id": "Q-104",
+      "intent": "SHOW_MASTER_DATA",
+      "desc": "bare",
+      "turns": [
+        {
+          "msg": "master data",
+          "expect_intent": "SHOW_MASTER_DATA"
+        }
+      ]
+    },
+    {
+      "id": "Q-105",
+      "intent": "SHOW_MASTER_DATA",
+      "desc": "system summary",
+      "turns": [
+        {
+          "msg": "system summary",
+          "expect_intent": "SHOW_MASTER_DATA"
+        }
+      ]
+    },
+    {
+      "id": "Q-110",
+      "intent": "QUERY_STAFF_ROOMS",
+      "desc": "show staff rooms",
+      "turns": [
+        {
+          "msg": "show staff rooms",
+          "expect_intent": "QUERY_STAFF_ROOMS",
+          "expect_contains": [
+            "Staff Rooms",
+            "G05",
+            "701"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-111",
+      "intent": "QUERY_STAFF_ROOMS",
+      "desc": "bare",
+      "turns": [
+        {
+          "msg": "staff rooms",
+          "expect_intent": "QUERY_STAFF_ROOMS",
+          "expect_contains": [
+            "Staff Rooms"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-112",
+      "intent": "QUERY_STAFF_ROOMS",
+      "desc": "which are",
+      "turns": [
+        {
+          "msg": "which are the staff rooms",
+          "expect_intent": "QUERY_STAFF_ROOMS"
+        }
+      ]
+    },
+    {
+      "id": "Q-113",
+      "intent": "QUERY_STAFF_ROOMS",
+      "desc": "list",
+      "turns": [
+        {
+          "msg": "list staff rooms",
+          "expect_intent": "QUERY_STAFF_ROOMS"
+        }
+      ]
+    },
+    {
+      "id": "Q-114",
+      "intent": "QUERY_STAFF_ROOMS",
+      "desc": "non revenue",
+      "turns": [
+        {
+          "msg": "non revenue rooms",
+          "expect_intent": "QUERY_STAFF_ROOMS"
+        }
+      ]
+    },
+    {
+      "id": "Q-115",
+      "intent": "QUERY_STAFF_ROOMS",
+      "desc": "labour rooms",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "labour rooms?",
+          "expect_intent": "QUERY_STAFF_ROOMS"
+        }
+      ]
+    },
+    {
+      "id": "Q-120",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "activity today",
+      "turns": [
+        {
+          "msg": "activity today",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-121",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "show activity",
+      "turns": [
+        {
+          "msg": "show activity",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-122",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "this week",
+      "turns": [
+        {
+          "msg": "activity this week",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-123",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "yesterday",
+      "turns": [
+        {
+          "msg": "activity yesterday",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-124",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "activity log bare",
+      "turns": [
+        {
+          "msg": "activity log",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-125",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "last n days",
+      "turns": [
+        {
+          "msg": "activity last 30 days",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-126",
+      "intent": "QUERY_ACTIVITY",
+      "desc": "room filter",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "activity room 105",
+          "expect_intent": "QUERY_ACTIVITY"
+        }
+      ]
+    },
+    {
+      "id": "Q-130",
+      "intent": "ACTIVITY_LOG",
+      "desc": "bare log asks for description (no write)",
+      "turns": [
+        {
+          "msg": "log",
+          "expect_intent": "ACTIVITY_LOG",
+          "expect_any": [
+            "description",
+            "what",
+            "Example"
+          ]
+        }
+      ],
+      "db_checks": [
+        {
+          "sql": "select count(*) from activity_log where description in ('log','')",
+          "expect": "0"
+        }
+      ]
+    },
+    {
+      "id": "Q-140",
+      "intent": "QUERY_UNHANDLED",
+      "desc": "unhandled requests",
+      "turns": [
+        {
+          "msg": "unhandled requests",
+          "expect_intent": "QUERY_UNHANDLED",
+          "expect_any": [
+            "Unhandled Requests",
+            "No unhandled requests"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-141",
+      "intent": "QUERY_UNHANDLED",
+      "desc": "show unhandled",
+      "turns": [
+        {
+          "msg": "show unhandled",
+          "expect_intent": "QUERY_UNHANDLED"
+        }
+      ]
+    },
+    {
+      "id": "Q-142",
+      "intent": "QUERY_UNHANDLED",
+      "desc": "what couldn't you understand",
+      "turns": [
+        {
+          "msg": "what couldn't you understand",
+          "expect_intent": "QUERY_UNHANDLED"
+        }
+      ]
+    },
+    {
+      "id": "Q-143",
+      "intent": "QUERY_UNHANDLED",
+      "desc": "missed messages",
+      "turns": [
+        {
+          "msg": "missed messages",
+          "expect_intent": "QUERY_UNHANDLED"
+        }
+      ]
+    },
+    {
+      "id": "Q-144",
+      "intent": "QUERY_UNHANDLED",
+      "desc": "failed queries",
+      "turns": [
+        {
+          "msg": "failed queries",
+          "expect_intent": "QUERY_UNHANDLED"
+        }
+      ]
+    },
+    {
+      "id": "Q-145",
+      "intent": "QUERY_UNHANDLED",
+      "desc": "receptionist",
+      "phone": "917680814628",
+      "turns": [
+        {
+          "msg": "unknown messages",
+          "expect_intent": "QUERY_UNHANDLED"
+        }
+      ]
+    },
+    {
+      "id": "Q-150",
+      "intent": "LLM",
+      "llm_only": true,
+      "desc": "free-form question answers or fails gracefully",
+      "turns": [
+        {
+          "msg": "which tenant has been staying with us the longest",
+          "expect_not_contains": [
+            "traceback",
+            "error"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-151",
+      "intent": "LLM",
+      "llm_only": true,
+      "desc": "free-form gibberish",
+      "turns": [
+        {
+          "msg": "blorp zzk qwe",
+          "expect_not_contains": [
+            "traceback"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-152",
+      "intent": "LLM",
+      "llm_only": true,
+      "desc": "free-form avg rent",
+      "turns": [
+        {
+          "msg": "tell me the average age of people living here",
+          "expect_not_contains": [
+            "traceback"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-160",
+      "intent": "ROLE",
+      "desc": "unknown phone silent",
+      "phone": "919999900001",
+      "turns": [
+        {
+          "msg": "vacant rooms",
+          "expect_silent": true
+        }
+      ],
+      "expect_outbound": 0
+    },
+    {
+      "id": "Q-161",
+      "intent": "ROLE",
+      "desc": "unknown phone silent occupancy",
+      "phone": "919999900001",
+      "turns": [
+        {
+          "msg": "occupancy",
+          "expect_silent": true
+        }
+      ],
+      "expect_outbound": 0
+    },
+    {
+      "id": "Q-162",
+      "intent": "ROLE",
+      "desc": "tenant phone silent",
+      "phone": "919000000000",
+      "turns": [
+        {
+          "msg": "vacant rooms",
+          "expect_silent": true
+        }
+      ],
+      "expect_outbound": 0
+    },
+    {
+      "id": "Q-163",
+      "intent": "ROOM_STATUS",
+      "desc": "room in over-capacity shows all occupants",
+      "turns": [
+        {
+          "msg": "room 320",
+          "expect_intent": "ROOM_STATUS",
+          "expect_contains": [
+            "Room 320"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-164",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "'how many' must not trigger male filter",
+      "turns": [
+        {
+          "msg": "how many rooms are free",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds"
+          ],
+          "expect_not_contains": [
+            "Beds available for Male"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-165",
+      "intent": "QUERY_CHECKOUTS",
+      "desc": "singular hinglish month",
+      "turns": [
+        {
+          "msg": "march me kaun gaya",
+          "expect_intent": "QUERY_CHECKOUTS",
+          "expect_contains": [
+            "March 2026"
+          ]
+        }
+      ]
+    }
+  ]
+}

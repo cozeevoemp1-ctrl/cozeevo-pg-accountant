@@ -26,6 +26,7 @@ from src.llm_gateway.agents.models import ConversationResult
 from src.llm_gateway.agents.prompt_builder import build_system_prompt
 from src.llm_gateway.agents.tools import search_similar_examples
 from src.database.models import PgConfig
+from src.llm_gateway.claude_client import groq_model, groq_payload_extras
 
 # Cache pg_config per pg_id to avoid repeated DB lookups
 _pg_config_cache: dict[str, dict] = {}
@@ -129,7 +130,7 @@ async def _call_llm(system_prompt: str, user_message: str) -> ConversationResult
         from pydantic_ai import Agent
 
         agent = Agent(
-            model="groq:llama-3.3-70b-versatile",
+            model=f"groq:{groq_model()}",
             system_prompt=system_prompt,
             output_type=ConversationResult,
             retries=3,
@@ -160,7 +161,8 @@ async def _call_llm_manual(system_prompt: str, user_message: str) -> Conversatio
 
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": groq_model(),
+        **groq_payload_extras(),
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},

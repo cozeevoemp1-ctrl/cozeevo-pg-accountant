@@ -1,0 +1,2093 @@
+{
+ "area": "ops",
+ "cases": [
+  {
+   "id": "O-001",
+   "intent": "HELP",
+   "desc": "admin help: only WhatsApp-working commands, chit block, app line",
+   "turns": [
+    {
+     "msg": "help",
+     "expect_intent": "HELP",
+     "expect_contains": [
+      "Kozzy app",
+      "show complaints",
+      "wifi password",
+      "Chits"
+     ],
+     "expect_not_contains": [
+      "paid 14000",
+      "who owes",
+      "remind unpaid",
+      "collect rent",
+      "log EB",
+      "void payment",
+      "_report_"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "O-002",
+   "intent": "HELP",
+   "desc": "receptionist help: no chit lines, no finance",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "help",
+     "expect_intent": "HELP",
+     "expect_contains": [
+      "Kozzy app",
+      "show complaints"
+     ],
+     "expect_not_contains": [
+      "chit",
+      "paid 14000",
+      "who owes",
+      "remind unpaid",
+      "collect rent"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-003",
+   "intent": "HELP",
+   "desc": "owner Lakshmi help: no chit lines",
+   "phone": "916000081043",
+   "turns": [
+    {
+     "msg": "menu",
+     "expect_intent": "HELP",
+     "expect_contains": [
+      "Kozzy app"
+     ],
+     "expect_not_contains": [
+      "chit",
+      "who owes"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-004",
+   "intent": "HELP",
+   "desc": "help phrasings",
+   "turns": [
+    {
+     "msg": "hi",
+     "expect_intent": "HELP",
+     "expect_contains": [
+      "Kozzy app"
+     ]
+    },
+    {
+     "msg": "what can you do",
+     "expect_intent": "HELP",
+     "expect_contains": [
+      "Kozzy app"
+     ]
+    },
+    {
+     "msg": "kya kar sakte ho",
+     "expect_intent": "HELP"
+    },
+    {
+     "msg": "commands",
+     "expect_intent": "HELP"
+    },
+    {
+     "msg": "Help",
+     "expect_intent": "HELP"
+    },
+    {
+     "msg": "hello",
+     "expect_intent": "HELP"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-005",
+   "intent": "MORE_MENU",
+   "desc": "more menu phrasings (used to go to LLM, invented finance menu)",
+   "turns": [
+    {
+     "msg": "more",
+     "expect_intent": "MORE_MENU",
+     "expect_contains": [
+      "Kozzy app",
+      "show complaints"
+     ],
+     "expect_not_contains": [
+      "expenses this month",
+      "add expense",
+      "set reminder"
+     ]
+    },
+    {
+     "msg": "more options",
+     "expect_intent": "MORE_MENU"
+    },
+    {
+     "msg": "show more",
+     "expect_intent": "MORE_MENU"
+    },
+    {
+     "msg": "full menu",
+     "expect_intent": "MORE_MENU"
+    },
+    {
+     "msg": "what else can you do?",
+     "expect_intent": "MORE_MENU"
+    },
+    {
+     "msg": "all commands",
+     "expect_intent": "MORE_MENU"
+    },
+    {
+     "msg": "MORE_MENU",
+     "expect_intent": "MORE_MENU"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-006",
+   "intent": "MORE_MENU",
+   "desc": "receptionist more",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "more",
+     "expect_intent": "MORE_MENU",
+     "expect_not_contains": [
+      "chit",
+      "who owes"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-010",
+   "intent": "MENU_EXAMPLES",
+   "desc": "every menu example in the check-in/rooms block works (first turn, cancelled)",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "add tenant",
+     "expect_intent": "ADD_TENANT",
+     "expect_any": [
+      "onboarding",
+      "form"
+     ]
+    },
+    {
+     "msg": "checkout Raj",
+     "expect_intent": "CHECKOUT",
+     "expect_any": [
+      "which one",
+      "checkout"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_any": [
+      "cancel"
+     ]
+    },
+    {
+     "msg": "Raj gave notice",
+     "expect_intent": "NOTICE_GIVEN",
+     "expect_any": [
+      "which one",
+      "notice"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_any": [
+      "cancel"
+     ]
+    },
+    {
+     "msg": "room 422",
+     "expect_intent": "ROOM_STATUS",
+     "expect_contains": [
+      "422"
+     ]
+    },
+    {
+     "msg": "vacant rooms",
+     "expect_intent": "QUERY_VACANT_ROOMS",
+     "expect_any": [
+      "empty beds",
+      "vacant"
+     ]
+    },
+    {
+     "msg": "transfer Raj to 305",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_any": [
+      "which one",
+      "305"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_any": [
+      "cancel"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-011",
+   "intent": "MENU_EXAMPLES",
+   "desc": "menu examples: staff/vendor/wifi/rules (literal text)",
+   "turns": [
+    {
+     "msg": "plumber contact",
+     "expect_intent": "QUERY_CONTACTS"
+    },
+    {
+     "msg": "wifi password",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "Thor"
+     ]
+    },
+    {
+     "msg": "rules",
+     "expect_intent": "RULES",
+     "expect_contains": [
+      "Rules"
+     ]
+    },
+    {
+     "msg": "staff Nobodyxyz exit",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "No active staff"
+     ]
+    },
+    {
+     "msg": "Raj vacation from 15 Oct to 20 Oct",
+     "expect_intent": "LOG_VACATION",
+     "expect_any": [
+      "more than one",
+      "vacation logged",
+      "already logged"
+     ]
+    },
+    {
+     "msg": "add contact",
+     "expect_intent": "ADD_CONTACT",
+     "expect_contains": [
+      "Name?"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_any": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-012",
+   "intent": "MENU_BUTTONS",
+   "desc": "interactive list button ids route to working handlers",
+   "turns": [
+    {
+     "msg": "QUERY_COMPLAINTS",
+     "expect_intent": "QUERY_COMPLAINTS",
+     "expect_any": [
+      "Open Complaints",
+      "No open complaints"
+     ]
+    },
+    {
+     "msg": "QUERY_CONTACTS",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_not_contains": [
+      "No contacts found for *query"
+     ]
+    },
+    {
+     "msg": "GET_WIFI_PASSWORD",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "WiFi"
+     ]
+    },
+    {
+     "msg": "RULES",
+     "expect_intent": "RULES"
+    },
+    {
+     "msg": "QUERY_VACANT_ROOMS",
+     "expect_intent": "QUERY_VACANT_ROOMS"
+    },
+    {
+     "msg": "QUERY_OCCUPANCY",
+     "expect_intent": "QUERY_OCCUPANCY"
+    },
+    {
+     "msg": "COMPLAINT_REGISTER",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Which room"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-013",
+   "intent": "UNKNOWN",
+   "desc": "fallback reply never suggests blocked finance commands",
+   "turns": [
+    {
+     "msg": "zzqx blorp",
+     "expect_not_contains": [
+      "paid [amount]",
+      "who hasn't paid",
+      "monthly report"
+     ]
+    }
+   ],
+   "llm_only": true,
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-020",
+   "intent": "SEND_REMINDER_ALL",
+   "desc": "reminders: honest, nothing queued or sent",
+   "turns": [
+    {
+     "msg": "send reminders to all",
+     "expect_intent": "SEND_REMINDER_ALL",
+     "expect_contains": [
+      "switched off",
+      "Nothing was sent"
+     ],
+     "expect_not_contains": [
+      "queued",
+      "will be notified"
+     ]
+    },
+    {
+     "msg": "remind unpaid",
+     "expect_intent": "SEND_REMINDER_ALL",
+     "expect_contains": [
+      "switched off"
+     ]
+    },
+    {
+     "msg": "remind all unpaid",
+     "expect_intent": "SEND_REMINDER_ALL"
+    },
+    {
+     "msg": "sabko reminder bhejo",
+     "expect_intent": "SEND_REMINDER_ALL"
+    },
+    {
+     "msg": "bulk reminder",
+     "expect_intent": "SEND_REMINDER_ALL"
+    },
+    {
+     "msg": "remind everyone",
+     "expect_intent": "SEND_REMINDER_ALL",
+     "expect_not_contains": [
+      "queued"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-021",
+   "intent": "SEND_REMINDER_ALL",
+   "desc": "receptionist reminders also honest",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "send reminders to all",
+     "expect_intent": "SEND_REMINDER_ALL",
+     "expect_contains": [
+      "switched off"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-022",
+   "intent": "REMINDER_SET",
+   "desc": "reminder set: honest, no fake done",
+   "turns": [
+    {
+     "msg": "remind Raj tomorrow",
+     "expect_intent": "REMINDER_SET",
+     "expect_contains": [
+      "switched off",
+      "Nothing was set"
+     ]
+    },
+    {
+     "msg": "set reminder",
+     "expect_intent": "REMINDER_SET",
+     "expect_contains": [
+      "switched off"
+     ]
+    },
+    {
+     "msg": "reminder for Yashika rent on 5th",
+     "expect_intent": "REMINDER_SET",
+     "expect_not_contains": [
+      "reminder set",
+      "will remind"
+     ]
+    },
+    {
+     "msg": "Yashika ko yaad dilao",
+     "expect_intent": "REMINDER_SET"
+    },
+    {
+     "msg": "remaindr Raj",
+     "expect_intent": "REMINDER_SET"
+    },
+    {
+     "msg": "notify Tanvi about rent",
+     "expect_intent": "REMINDER_SET"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-023",
+   "intent": "ADD_PARTNER",
+   "desc": "admin add partner: honest (allowlist is in code)",
+   "turns": [
+    {
+     "msg": "add partner +917001234567 Suresh",
+     "expect_intent": "ADD_PARTNER",
+     "expect_contains": [
+      "in code"
+     ],
+     "expect_not_contains": [
+      "Send: *add partner"
+     ]
+    },
+    {
+     "msg": "add partner",
+     "expect_intent": "ADD_PARTNER",
+     "expect_contains": [
+      "in code"
+     ]
+    },
+    {
+     "msg": "give access to 9876543210",
+     "expect_intent": "ADD_PARTNER"
+    },
+    {
+     "msg": "add owner +919876543210 Suresh",
+     "expect_intent": "ADD_PARTNER"
+    },
+    {
+     "msg": "new admin 9876543210",
+     "expect_intent": "ADD_PARTNER"
+    },
+    {
+     "msg": "add power user 9876543210",
+     "expect_intent": "ADD_PARTNER"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-024",
+   "intent": "ADD_PARTNER",
+   "desc": "receptionist add partner refused",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "add partner +917001234567 Suresh",
+     "expect_intent": "ADD_PARTNER",
+     "expect_contains": [
+      "only be changed by the admin"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-030",
+   "intent": "ADD_STAFF",
+   "desc": "anchor staff in 702 (keeps 702 a staff room through exits); idempotent",
+   "turns": [
+    {
+     "msg": "add staff Anchor Guard | Security | 9000 | 01-01-1990 | 9876500001 | 1234-5678-9012 | room 702",
+     "expect_intent": "ADD_STAFF",
+     "expect_any": [
+      "Staff added",
+      "already an active staff"
+     ]
+    },
+    {
+     "msg": "skip",
+     "allow_empty": true
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from staff where name='Anchor Guard' and active",
+     "expect": "1"
+    },
+    {
+     "sql": "select date_of_birth from staff where name='Anchor Guard' and active",
+     "expect": "1990-01-01"
+    },
+    {
+     "sql": "select r.room_number from staff s join rooms r on r.id=s.room_id where s.name='Anchor Guard' and s.active",
+     "expect": "702"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='staff' and entity_name='Anchor Guard' and field='created'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-031",
+   "intent": "ADD_STAFF",
+   "desc": "add staff bare / no pipes / prompt",
+   "turns": [
+    {
+     "msg": "add staff",
+     "expect_intent": "ADD_STAFF",
+     "expect_contains": [
+      "add staff [name]"
+     ]
+    },
+    {
+     "msg": "register staff",
+     "expect_intent": "ADD_STAFF",
+     "expect_contains": [
+      "add staff [name]"
+     ]
+    },
+    {
+     "msg": "new staff member",
+     "expect_intent": "ADD_STAFF"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-032",
+   "intent": "ADD_STAFF",
+   "desc": "menu example add staff Ravi | Cook | 9000 + KYC skip; duplicate guarded",
+   "turns": [
+    {
+     "msg": "add staff Ravi | Cook | 9000",
+     "expect_intent": "ADD_STAFF",
+     "expect_any": [
+      "Staff added",
+      "already an active staff"
+     ]
+    },
+    {
+     "msg": "skip",
+     "allow_empty": true
+    },
+    {
+     "msg": "add staff Ravi | Cook | 9000",
+     "expect_intent": "ADD_STAFF",
+     "expect_contains": [
+      "already an active staff"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from staff where name='Ravi' and active",
+     "expect": "1"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-033",
+   "intent": "ASSIGN_STAFF_ROOM",
+   "desc": "assign phrasings (Ravi → 702 / G05 / 701 are all staff rooms already)",
+   "turns": [
+    {
+     "msg": "staff Ravi room G05",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "Ravi",
+      "G05"
+     ]
+    },
+    {
+     "msg": "assign staff Ravi to 701",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "701"
+     ]
+    },
+    {
+     "msg": "put staff ravi in g05",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "G05"
+     ]
+    },
+    {
+     "msg": "move staff Ravi to 702",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "702"
+     ]
+    },
+    {
+     "msg": "staff ravi shift to room 701",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "701"
+     ]
+    },
+    {
+     "msg": "staff ravi 702 mein",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "702"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from staff s join rooms r on r.id=s.room_id where s.name='Ravi' and s.active",
+     "expect": "702"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='staff' and field='room_id' and entity_id=(select max(id) from staff where name='Ravi')",
+     "expect": "nonzero"
+    },
+    {
+     "sql": "select bool_and(is_staff_room) from rooms where room_number in ('701','702','G05')",
+     "expect": "True"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-034",
+   "intent": "ASSIGN_STAFF_ROOM",
+   "desc": "assign not-found staff / bad room",
+   "turns": [
+    {
+     "msg": "staff Nobodyxyz room 702",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "No active staff"
+     ]
+    },
+    {
+     "msg": "staff Ravi room 9999",
+     "expect_intent": "ASSIGN_STAFF_ROOM",
+     "expect_contains": [
+      "not found"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-035",
+   "intent": "EXIT_STAFF",
+   "desc": "exit Ravi (in 702 with anchor → 702 stays staff room)",
+   "turns": [
+    {
+     "msg": "staff Ravi exit",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "marked as exited",
+      "still has other staff"
+     ]
+    },
+    {
+     "msg": "exit staff Ravi",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "No active staff"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from staff where name='Ravi' and active",
+     "expect": "0"
+    },
+    {
+     "sql": "select is_staff_room from rooms where room_number='702'",
+     "expect": "True"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='staff' and field='active' and entity_id=(select max(id) from staff where name='Ravi')",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-036",
+   "intent": "EXIT_STAFF",
+   "desc": "exit phrasings (no such staff → clean not-found)",
+   "turns": [
+    {
+     "msg": "staff Ghostman left",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "No active staff"
+     ]
+    },
+    {
+     "msg": "Ghostman staff exited",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "No active staff"
+     ]
+    },
+    {
+     "msg": "staff ghostman resigned",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "No active staff"
+     ]
+    },
+    {
+     "msg": "staff Ghostman gone",
+     "expect_intent": "EXIT_STAFF"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-037",
+   "intent": "ADD_STAFF",
+   "desc": "receptionist can add + exit staff (no role gate in code)",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "add staff Recep Temp | Housekeeping | 8000 | | | | room 702",
+     "expect_intent": "ADD_STAFF",
+     "expect_contains": [
+      "Staff added"
+     ]
+    },
+    {
+     "msg": "skip",
+     "allow_empty": true
+    },
+    {
+     "msg": "staff Recep Temp exit",
+     "expect_intent": "EXIT_STAFF",
+     "expect_contains": [
+      "marked as exited"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from staff where name='Recep Temp' and active",
+     "expect": "0"
+    }
+   ]
+  },
+  {
+   "id": "O-040",
+   "intent": "COMPLAINT_REGISTER",
+   "desc": "register then resolve by room (menu examples), audit both",
+   "turns": [
+    {
+     "msg": "no water room 512",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Complaint Logged",
+      "512"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Complaint Resolved",
+      "512"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from complaints c join tenancies t on t.id=c.tenancy_id join rooms r on r.id=t.room_id where r.room_number='512' and c.status in ('open','in_progress')",
+     "expect": "0"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='complaint' and field='complaint_created' and entity_id=(select max(c.id) from complaints c join tenancies t on t.id=c.tenancy_id join rooms r on r.id=t.room_id where r.room_number='512')",
+     "expect": "1"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='complaint' and field='complaint_status' and entity_id=(select max(c.id) from complaints c join tenancies t on t.id=c.tenancy_id join rooms r on r.id=t.room_id where r.room_number='512')",
+     "expect": "1"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-041",
+   "intent": "COMPLAINT_REGISTER",
+   "desc": "register phrasings (each resolved after)",
+   "turns": [
+    {
+     "msg": "room 512 fan not working",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Electricity"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "complaint room 512 wifi issue",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Wi-Fi"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "512 tap leaking",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Plumbing"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "wifi password not working room 512",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Wi-Fi"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "room 512 chair broken",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Complaint Logged"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "room 512 light kharab",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Complaint Logged"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_contains": [
+      "Resolved"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-042",
+   "intent": "COMPLAINT_REGISTER",
+   "desc": "duplicate open complaint not created; no room; vacant room; lowercase G room",
+   "turns": [
+    {
+     "msg": "room 513 fan not working",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_any": [
+      "Complaint Logged",
+      "already has an open"
+     ]
+    },
+    {
+     "msg": "room 513 fan not working again",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "already has an open"
+     ]
+    },
+    {
+     "msg": "fan not working",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Which room"
+     ]
+    },
+    {
+     "msg": "room 624 tap leaking",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "No active tenant"
+     ]
+    },
+    {
+     "msg": "room g10 fan not working",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_any": [
+      "Complaint Logged — Room G10",
+      "already has an open"
+     ]
+    },
+    {
+     "msg": "resolve complaint G10",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Resolved"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from complaints c join tenancies t on t.id=c.tenancy_id join rooms r on r.id=t.room_id where r.room_number='513' and c.status in ('open','in_progress') and c.category='electricity'",
+     "expect": "1"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-043",
+   "intent": "COMPLAINT_UPDATE",
+   "desc": "room with 2 open complaints → asks which, closes nothing",
+   "turns": [
+    {
+     "msg": "room 513 tap leaking",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_any": [
+      "Complaint Logged",
+      "already has an open"
+     ]
+    },
+    {
+     "msg": "resolve complaint 513",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "which one"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from complaints c join tenancies t on t.id=c.tenancy_id join rooms r on r.id=t.room_id where r.room_number='513' and c.status in ('open','in_progress')",
+     "expect": "2"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-044",
+   "intent": "COMPLAINT_UPDATE",
+   "desc": "close complaint with no ref → lists, does NOT close an arbitrary one",
+   "turns": [
+    {
+     "msg": "close complaint",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Which one is fixed"
+     ]
+    },
+    {
+     "msg": "mark complaint resolved",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Which one is fixed"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from complaints where id in (2,3,5,10) and status in ('open','in_progress')",
+     "expect": "4"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-045",
+   "intent": "COMPLAINT_UPDATE",
+   "desc": "resolve phrasings + not found + already resolved",
+   "turns": [
+    {
+     "msg": "room 512 fan not working",
+     "expect_intent": "COMPLAINT_REGISTER"
+    },
+    {
+     "msg": "complaint solved 512",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "512 fan kharab",
+     "expect_intent": "COMPLAINT_REGISTER"
+    },
+    {
+     "msg": "fixed complaint 512",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Resolved"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "No matching complaint"
+     ]
+    },
+    {
+     "msg": "resolve complaint #1",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "already resolved"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-046",
+   "intent": "QUERY_COMPLAINTS",
+   "desc": "list phrasings",
+   "turns": [
+    {
+     "msg": "show complaints",
+     "expect_intent": "QUERY_COMPLAINTS",
+     "expect_contains": [
+      "Open Complaints"
+     ]
+    },
+    {
+     "msg": "open complaints",
+     "expect_intent": "QUERY_COMPLAINTS"
+    },
+    {
+     "msg": "pending complaints list",
+     "expect_intent": "QUERY_COMPLAINTS"
+    },
+    {
+     "msg": "how many complaints",
+     "expect_intent": "QUERY_COMPLAINTS"
+    },
+    {
+     "msg": "complaint status",
+     "expect_intent": "QUERY_COMPLAINTS",
+     "expect_not_contains": [
+      "Finance"
+     ]
+    },
+    {
+     "msg": "kitne complaints hai",
+     "expect_intent": "QUERY_COMPLAINTS"
+    },
+    {
+     "msg": "unresolved complaints",
+     "expect_intent": "QUERY_COMPLAINTS"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-047",
+   "intent": "COMPLAINT_REGISTER",
+   "desc": "receptionist logs + resolves",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "room 512 door lock broken",
+     "expect_intent": "COMPLAINT_REGISTER",
+     "expect_contains": [
+      "Complaint Logged"
+     ]
+    },
+    {
+     "msg": "resolve complaint 512",
+     "expect_intent": "COMPLAINT_UPDATE",
+     "expect_contains": [
+      "Resolved by: Lokesh"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-050",
+   "intent": "ADD_CONTACT",
+   "desc": "add contact one-shot → notes → confirm; repeat says exists; audit",
+   "turns": [
+    {
+     "msg": "add plumber Opsravi 9876500011",
+     "expect_intent": "ADD_CONTACT",
+     "expect_contains": [
+      "Any notes"
+     ]
+    },
+    {
+     "msg": "taps and pipes",
+     "expect_contains": [
+      "Add Contact?"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_any": [
+      "Contact saved",
+      "already exists"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from pg_contacts where phone='9876500011'",
+     "expect": "1"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='contact' and field='contact_created' and new_value like '9876500011%'",
+     "expect": "1"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-051",
+   "intent": "ADD_CONTACT",
+   "desc": "step-by-step add contact with invalid phone then valid; cancel at end",
+   "turns": [
+    {
+     "msg": "add contact",
+     "expect_intent": "ADD_CONTACT",
+     "expect_contains": [
+      "Name?"
+     ]
+    },
+    {
+     "msg": "Opselec Kumar",
+     "expect_contains": [
+      "Phone number?"
+     ]
+    },
+    {
+     "msg": "abc",
+     "expect_contains": [
+      "valid phone"
+     ]
+    },
+    {
+     "msg": "98765 00012",
+     "expect_contains": [
+      "What do they do"
+     ]
+    },
+    {
+     "msg": "electrician",
+     "expect_contains": [
+      "Any notes"
+     ]
+    },
+    {
+     "msg": "skip",
+     "expect_contains": [
+      "Add Contact?"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from pg_contacts where phone='9876500012'",
+     "expect": "zero"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-052",
+   "intent": "ADD_CONTACT",
+   "desc": "add contact phrasings (first turn, then cancel)",
+   "turns": [
+    {
+     "msg": "save electrician Opskumar 8765400013",
+     "expect_intent": "ADD_CONTACT",
+     "expect_contains": [
+      "Any notes"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "new vendor Sri Water 9988700014",
+     "expect_intent": "ADD_CONTACT"
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "add Mahadevapura lineman 9886100015",
+     "expect_intent": "ADD_CONTACT",
+     "expect_contains": [
+      "Electrician"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "plumber ka number save karo Opsraju 9876500016",
+     "expect_intent": "ADD_CONTACT"
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-053",
+   "intent": "QUERY_CONTACTS",
+   "desc": "lookup phrasings find the saved plumber",
+   "turns": [
+    {
+     "msg": "plumber contact",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "give me plumber number",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "who is our plumber",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "plumber kaun hai",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "Opsravi number",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "all contacts",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "show vendors",
+     "expect_intent": "QUERY_CONTACTS"
+    },
+    {
+     "msg": "carpenter contact",
+     "expect_intent": "QUERY_CONTACTS",
+     "expect_contains": [
+      "No contacts found"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-054",
+   "intent": "UPDATE_CONTACT",
+   "desc": "update notes of saved contact, confirm, audit",
+   "turns": [
+    {
+     "msg": "update contact Opsravi",
+     "expect_intent": "UPDATE_CONTACT",
+     "expect_contains": [
+      "What to update"
+     ]
+    },
+    {
+     "msg": "5",
+     "expect_contains": [
+      "Reply *1*"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "New notes"
+     ]
+    },
+    {
+     "msg": "plumbing AMC 2k per visit",
+     "expect_contains": [
+      "Reply *Yes*"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select contact_for from pg_contacts where phone='9876500011'",
+     "expect": "plumbing AMC 2k per visit"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='contact' and field='contact_notes' and entity_name='Plumber Opsravi'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-055",
+   "intent": "UPDATE_CONTACT",
+   "desc": "update phrasings + not found + cancel",
+   "turns": [
+    {
+     "msg": "edit vendor Opsravi",
+     "expect_intent": "UPDATE_CONTACT",
+     "expect_contains": [
+      "What to update"
+     ]
+    },
+    {
+     "msg": "4",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "update plumber Opsravi phone",
+     "expect_intent": "UPDATE_CONTACT",
+     "expect_contains": [
+      "What to update"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "update contact Zzznobody",
+     "expect_intent": "UPDATE_CONTACT",
+     "expect_contains": [
+      "No contact found"
+     ]
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-060",
+   "intent": "GET_WIFI_PASSWORD",
+   "desc": "wifi phrasings",
+   "turns": [
+    {
+     "msg": "wifi password",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "Thor",
+      "Hulk"
+     ]
+    },
+    {
+     "msg": "what's the wifi",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "WiFi"
+     ]
+    },
+    {
+     "msg": "wifi pass thor",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "Thor"
+     ],
+     "expect_not_contains": [
+      "Hulk Block"
+     ]
+    },
+    {
+     "msg": "wifi password hulk floor 2",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "Cozeevo H2"
+     ],
+     "expect_not_contains": [
+      "Cozeevo H5"
+     ]
+    },
+    {
+     "msg": "net ka password batao",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "WiFi"
+     ]
+    },
+    {
+     "msg": "wifi kya hai",
+     "expect_intent": "GET_WIFI_PASSWORD"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-061",
+   "intent": "GET_WIFI_PASSWORD",
+   "desc": "receptionist wifi",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "wifi password",
+     "expect_intent": "GET_WIFI_PASSWORD",
+     "expect_contains": [
+      "WiFi"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-062",
+   "intent": "SET_WIFI",
+   "desc": "set wifi (idempotent value) + audit; format prompt; unknown network",
+   "turns": [
+    {
+     "msg": "update wifi thor Cozeevo T2 password thor2@123",
+     "expect_intent": "SET_WIFI",
+     "expect_contains": [
+      "WiFi updated"
+     ]
+    },
+    {
+     "msg": "change wifi password",
+     "expect_intent": "SET_WIFI",
+     "expect_contains": [
+      "Format"
+     ]
+    },
+    {
+     "msg": "set wifi",
+     "expect_intent": "SET_WIFI",
+     "expect_contains": [
+      "Format"
+     ]
+    },
+    {
+     "msg": "update wifi hulk NoSuchNet password x123",
+     "expect_intent": "SET_WIFI",
+     "expect_contains": [
+      "not found"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from audit_log where field='wifi_password'",
+     "expect": "nonzero"
+    },
+    {
+     "sql": "select wifi_floor_map->'thor'->'2'->0->>'password' from properties where id=1",
+     "expect": "thor2@123"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-070",
+   "intent": "LOG_VACATION",
+   "desc": "tenant vacation logged (501), repeat = already logged, audit",
+   "turns": [
+    {
+     "msg": "Yashika Rathore vacation from 15 Nov to 20 Nov",
+     "expect_intent": "LOG_VACATION",
+     "expect_any": [
+      "Vacation logged",
+      "already logged"
+     ]
+    },
+    {
+     "msg": "Yashika Rathore going home from 15 Nov to 20 Nov",
+     "expect_intent": "LOG_VACATION",
+     "expect_contains": [
+      "already logged"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from vacations v join tenancies t on t.id=v.tenancy_id join rooms r on r.id=t.room_id where r.room_number='501' and v.from_date='2026-11-15' and v.to_date='2026-11-20'",
+     "expect": "1"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='vacation' and room_number='501'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-071",
+   "intent": "LOG_VACATION",
+   "desc": "vacation phrasings / missing dates / not found / duration form",
+   "turns": [
+    {
+     "msg": "Neha Acharya on vacation",
+     "expect_intent": "LOG_VACATION",
+     "expect_contains": [
+      "dates needed"
+     ]
+    },
+    {
+     "msg": "log vacation",
+     "expect_intent": "LOG_VACATION",
+     "expect_contains": [
+      "Who is going on vacation"
+     ]
+    },
+    {
+     "msg": "Zzqnobody on leave from 1 Dec to 5 Dec",
+     "expect_intent": "LOG_VACATION",
+     "expect_not_contains": [
+      "logged"
+     ]
+    },
+    {
+     "msg": "Neha Acharya out of station from 10 Dec for 4 days",
+     "expect_intent": "LOG_VACATION",
+     "expect_any": [
+      "Vacation logged",
+      "already logged"
+     ],
+     "expect_contains": [
+      "14 Dec"
+     ]
+    },
+    {
+     "msg": "Neha Acharya vacation from 20 Dec to 18 Dec 2026",
+     "expect_intent": "LOG_VACATION",
+     "expect_contains": [
+      "before"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from vacations v join tenancies t on t.id=v.tenancy_id join rooms r on r.id=t.room_id where r.room_number='512' and v.from_date='2026-12-10' and v.to_date='2026-12-14'",
+     "expect": "1"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-072",
+   "intent": "LOG_VACATION",
+   "desc": "employee leave (Lokesh/Dilip) → operational log, idempotent",
+   "turns": [
+    {
+     "msg": "Lokesh on leave from 15 oct to 18 oct",
+     "expect_intent": "LOG_VACATION",
+     "expect_any": [
+      "Leave logged",
+      "already logged"
+     ]
+    },
+    {
+     "msg": "Dilip chutti pe hai 3 din",
+     "expect_intent": "LOG_VACATION",
+     "expect_contains": [
+      "dates needed"
+     ]
+    },
+    {
+     "msg": "Lokesh on leave from 15 oct to 18 oct",
+     "expect_intent": "LOG_VACATION",
+     "expect_contains": [
+      "already logged"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from operational_logs where category='vacation' and details->>'employee'='Lokesh' and details->>'start_date'='2026-10-15' and details->>'end_date'='2026-10-18'",
+     "expect": "1"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='operational_log' and entity_name='Lokesh'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-080",
+   "intent": "RULES",
+   "desc": "rules phrasings + roles",
+   "turns": [
+    {
+     "msg": "rules",
+     "expect_intent": "RULES",
+     "expect_contains": [
+      "Rules & Regulations"
+     ]
+    },
+    {
+     "msg": "pg rules",
+     "expect_intent": "RULES"
+    },
+    {
+     "msg": "house rules",
+     "expect_intent": "RULES"
+    },
+    {
+     "msg": "niyam batao",
+     "expect_intent": "RULES"
+    },
+    {
+     "msg": "what are the rules",
+     "expect_intent": "RULES"
+    },
+    {
+     "msg": "rules and regulations",
+     "expect_intent": "RULES"
+    }
+   ],
+   "phone": "916000081041"
+  },
+  {
+   "id": "O-081",
+   "intent": "RULES",
+   "desc": "receptionist rules",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "rules",
+     "expect_intent": "RULES",
+     "expect_contains": [
+      "Rules"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-090",
+   "intent": "CHIT_LOG",
+   "desc": "Kiran logs a chit (new row each time = correct), audit written",
+   "turns": [
+    {
+     "msg": "paid Opschit chit 1.5L on 1 oct",
+     "expect_intent": "CHIT_LOG",
+     "expect_contains": [
+      "Recorded Chit",
+      "1,50,000",
+      "01 Oct 2026"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from chit_payments where name='Opschit' and not is_void",
+     "expect": "nonzero"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='chit_payment' and entity_name='Opschit' and field='created'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "O-091",
+   "intent": "CHIT_LOG",
+   "desc": "chit log phrasings (Prabhakaran) + loan/bank",
+   "phone": "919444296681",
+   "turns": [
+    {
+     "msg": "chit Opschit 50000 today",
+     "expect_intent": "CHIT_LOG",
+     "expect_contains": [
+      "Recorded Chit"
+     ]
+    },
+    {
+     "msg": "Opschit loan 25k bank yesterday chit",
+     "expect_intent": "CHIT_LOG",
+     "expect_contains": [
+      "Recorded Loan",
+      "bank"
+     ]
+    },
+    {
+     "msg": "gave Opschit chit 2,00,000 on 5 oct",
+     "expect_intent": "CHIT_LOG",
+     "expect_contains": [
+      "2,00,000"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-092",
+   "intent": "CHIT_QUERY",
+   "desc": "chit query phrasings",
+   "turns": [
+    {
+     "msg": "chit summary",
+     "expect_intent": "CHIT_QUERY",
+     "expect_contains": [
+      "Chit payments"
+     ]
+    },
+    {
+     "msg": "chit Opschit",
+     "expect_intent": "CHIT_QUERY",
+     "expect_contains": [
+      "Opschit"
+     ]
+    },
+    {
+     "msg": "chits",
+     "expect_intent": "CHIT_QUERY"
+    },
+    {
+     "msg": "chit oct",
+     "expect_intent": "CHIT_QUERY",
+     "expect_contains": [
+      "Oct 2026"
+     ]
+    },
+    {
+     "msg": "how much chit paid so far",
+     "expect_intent": "CHIT_QUERY"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "O-093",
+   "intent": "CHIT_EDIT",
+   "desc": "edit seeded #900 (idempotent target) + audit",
+   "turns": [
+    {
+     "msg": "chit 900 amount 2.5L",
+     "expect_intent": "CHIT_EDIT",
+     "expect_any": [
+      "Updated #900",
+      "already has those values"
+     ]
+    },
+    {
+     "msg": "edit chit 900 date 1 sep",
+     "expect_intent": "CHIT_EDIT",
+     "expect_any": [
+      "Updated #900",
+      "already has those values"
+     ]
+    },
+    {
+     "msg": "chit 900 amount 2.5L",
+     "expect_intent": "CHIT_EDIT",
+     "expect_contains": [
+      "already has those values"
+     ]
+    },
+    {
+     "msg": "chit 99999 amount 1L",
+     "expect_intent": "CHIT_EDIT",
+     "expect_contains": [
+      "No active chit"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select amount::int from chit_payments where id=900",
+     "expect": "250000"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='chit_payment' and entity_id=900 and field='edited'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "O-094",
+   "intent": "CHIT_VOID",
+   "desc": "void seeded #901 (voided, never deleted) + audit",
+   "turns": [
+    {
+     "msg": "void chit 901",
+     "expect_intent": "CHIT_VOID",
+     "expect_any": [
+      "Voided #901",
+      "No active chit payment #901"
+     ]
+    },
+    {
+     "msg": "chit 901 void",
+     "expect_intent": "CHIT_VOID",
+     "expect_contains": [
+      "No active chit payment #901"
+     ]
+    },
+    {
+     "msg": "delete chit 99999",
+     "expect_intent": "CHIT_VOID",
+     "expect_contains": [
+      "No active chit"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select is_void from chit_payments where id=901",
+     "expect": "True"
+    },
+    {
+     "sql": "select count(*) from chit_payments where id=901",
+     "expect": "1"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='chit_payment' and entity_id=901 and field='chit.void'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "O-095",
+   "intent": "CHIT_GUARD",
+   "desc": "Lokesh refused for every chit intent; nothing written or revealed",
+   "phone": "916000081042",
+   "turns": [
+    {
+     "msg": "chit summary",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Opschit",
+      "Chit payments"
+     ]
+    },
+    {
+     "msg": "paid Lokchit chit 5L today",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Recorded"
+     ]
+    },
+    {
+     "msg": "void chit 900",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Voided"
+     ]
+    },
+    {
+     "msg": "chit 900 amount 1L",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from chit_payments where name ilike 'Lokchit%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select amount::int from chit_payments where id=900",
+     "expect": "250000"
+    },
+    {
+     "sql": "select is_void from chit_payments where id=900",
+     "expect": "False"
+    }
+   ]
+  },
+  {
+   "id": "O-096",
+   "intent": "CHIT_GUARD",
+   "desc": "owner 'Lakshmi' refused too (owner role is not enough)",
+   "phone": "916000081043",
+   "turns": [
+    {
+     "msg": "chit summary",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Opschit",
+      "Chit payments"
+     ]
+    },
+    {
+     "msg": "paid Lakchit chit 5L today",
+     "expect_contains": [
+      "didn't understand"
+     ]
+    },
+    {
+     "msg": "void chit 900",
+     "expect_contains": [
+      "didn't understand"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from chit_payments where name ilike 'Lakchit%'",
+     "expect": "zero"
+    },
+    {
+     "sql": "select is_void from chit_payments where id=900",
+     "expect": "False"
+    }
+   ]
+  },
+  {
+   "id": "O-097",
+   "intent": "CHIT_GUARD",
+   "desc": "real Lokesh phone refused",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "chit summary",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Chit payments",
+      "Opschit"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-098",
+   "intent": "CHIT_GUARD",
+   "desc": "real Lakshmi (owner) phone refused",
+   "phone": "917358341775",
+   "turns": [
+    {
+     "msg": "chit summary",
+     "expect_contains": [
+      "didn't understand"
+     ],
+     "expect_not_contains": [
+      "Chit payments",
+      "Opschit"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "O-099",
+   "intent": "BLOCKED",
+   "desc": "unknown number + tenant number get no reply to ops commands",
+   "phone": "919999900001",
+   "turns": [
+    {
+     "msg": "help",
+     "expect_silent": true
+    },
+    {
+     "msg": "wifi password",
+     "expect_silent": true
+    },
+    {
+     "msg": "room 512 fan not working",
+     "expect_silent": true
+    }
+   ]
+  }
+ ],
+ "note": "Run against a port-8104 server started with DEMO_MODE=1 and DEMO_ROLES giving ops-only phones (916000081041 admin, 916000081042 receptionist, 916000081043 owner) plus the 4 real staff phones — other agents share Kiran's phone and their pending prompts hijack replies. Chit cases must use the real Kiran/Prabhakaran phones (CHIT_PHONES is hardcoded)."
+}

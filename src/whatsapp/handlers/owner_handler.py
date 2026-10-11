@@ -87,7 +87,7 @@ async def handle_owner(
     handlers = {
         "ADD_TENANT":         _add_tenant_prompt,
         "CHECKOUT":           _checkout_prompt,
-        "SCHEDULE_CHECKOUT":  _checkout_prompt,   # same handler — date in entities distinguishes
+        "SCHEDULE_CHECKOUT":  _schedule_checkout_prompt,   # resolves "tomorrow"/"end of month", never defaults to today
         "UPDATE_CHECKIN":     _update_checkin,
         "CHECKIN_ARRIVAL":    _checkin_arrival,
         "UPDATE_CHECKOUT_DATE": _update_checkout_date,
@@ -311,7 +311,6 @@ async def _do_confirm_checkout(
     _checkout_month    = cs.checkout_date.month
     _checkout_year     = cs.checkout_date.year
     _is_daily          = tenancy and tenancy.stay_type.value == "daily"
-    _tenant_phone      = cs.tenant_phone
     _refund_amount     = int(cs.refund_amount)
     _refund_mode       = cs.refund_mode
 
@@ -346,28 +345,7 @@ async def _do_confirm_checkout(
         f"{refund_line}"
     )
 
-    # Fire-and-forget: WhatsApp tenant notification — does NOT block the HTTP response
-    if _tenant_phone:
-        _phone_wa = f"+91{_tenant_phone}" if not _tenant_phone.startswith("+") else _tenant_phone
-        _wa_refund = (
-            f"Refund of Rs.{_refund_amount:,} will be processed by the receptionist."
-            if _refund_amount > 0 else ""
-        )
-        _wa_msg = (
-            f"Your checkout from Room {room_number} on "
-            f"{cs.checkout_date.strftime('%d %b %Y')} has been recorded.\n"
-            + (f"{_wa_refund}\n" if _wa_refund else "")
-            + "Thank you for staying with Cozeevo."
-        )
-
-        async def _wa_task() -> None:
-            try:
-                from src.whatsapp.webhook_handler import _send_whatsapp
-                await _asyncio.wait_for(_send_whatsapp(_phone_wa, _wa_msg), timeout=10)
-            except Exception as _e:
-                logger.warning("WhatsApp checkout notification failed: %s", _e)
-
-        _asyncio.create_task(_wa_task())
+    # No WhatsApp to the tenant (rules_no_tenant_comms) — staff share the outcome.
 
     return summary
 
@@ -399,22 +377,7 @@ async def _build_checkout_summary(action_data: dict, phone: str, session: "Async
     # Their deposit is always refundable (minus dues/deductions).
     _is_daily = bool(tenancy and tenancy.stay_type.value == "daily")
     deposit_forfeited = False if _is_daily else not is_deposit_eligible(nd)
-    notice_line = ""
-    if _is_daily:
-        notice_line = ""  # day-stay: no notice concept
-    elif nd is None:
-        notice_line = "\nNo notice on record — *deposit forfeited*"
-    elif nd.day <= _NOTICE_BY_DAY:
-        notice_line = (
-            f"\nNotice: {nd.strftime('%d %b %Y')} "
-            f"(on time, on/before {_NOTICE_BY_DAY}th) — deposit refundable"
-        )
-    else:
-        notice_line = (
-            f"\nNotice: {nd.strftime('%d %b %Y')} "
-            f"(after {_NOTICE_BY_DAY}th — next month's cycle, full month rent required) "
-            f"— *deposit forfeited*"
-        )
+    notice_line = "" if _is_daily else "\n" + _notice_line(nd)  # day-stay: no notice concept
 
     maintenance = int(tenancy.maintenance_fee or 0) if tenancy else 0
     if deposit_forfeited:
@@ -1787,7 +1750,10 @@ async def resolve_pending_action(
             tenant_name = choices[0].get("label", "")
         if not tenancy_id:
             return "Something went wrong. Please try again: *change checkout date [Name] to [date]*"
-        return await _do_update_checkout_date(tenancy_id, tenant_name, date_iso, session)
+        return await _do_update_checkout_date(tenancy_id, tenant_name, date_iso, session, changed_by=pending.phone or "whatsapp")
+
+    if pending.intent == "START_ONBOARDING":
+        return await _resolve_start_onboarding(pending, reply_text, action_data, session)
 
     if pending.intent == "RECORD_CHECKOUT":
         step = action_data.get("step", "")
@@ -1883,6 +1849,9 @@ async def resolve_pending_action(
         if step == "confirm_checkout":
             if ans in ("confirm", "yes", "y", "done", "ok", "proceed"):
                 tenancy_id = action_data.get("tenancy_id")
+                _t_guard = await session.get(Tenancy, tenancy_id) if tenancy_id else None
+                if not _t_guard or _t_guard.status != TenancyStatus.active:
+                    return "This tenancy is no longer active (already checked out?). Nothing changed."
                 exit_date = date.fromisoformat(action_data["exit_date"]) if action_data.get("exit_date") else date.today()
                 refund_amt = action_data.get("auto_refund", 0)
                 deposit_forfeited = action_data.get("deposit_forfeited", False)
@@ -1906,7 +1875,7 @@ async def resolve_pending_action(
                 if tenancy_id:
                     _ded_reason = action_data.get("deduction_reason") or ""
                     reason = (
-                        "deposit forfeited — late notice" if deposit_forfeited
+                        "deposit forfeited — no notice" if deposit_forfeited
                         else (_ded_reason if _ded_reason else "deposit refund on checkout")
                     )
                     session.add(Refund(
@@ -1921,8 +1890,29 @@ async def resolve_pending_action(
                 # Mark tenancy as exited
                 tenancy = await session.get(Tenancy, tenancy_id)
                 if tenancy:
+                    _old_status = tenancy.status.value if hasattr(tenancy.status, "value") else str(tenancy.status)
                     tenancy.status = TenancyStatus.exited
                     tenancy.checkout_date = exit_date
+                    # Same audit convention as _do_confirm_checkout (PWA) — feed shows "Checked out"
+                    _cr_room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+                    from src.database.models import AuditLog as _AuditLog
+                    session.add(_AuditLog(
+                        changed_by=pending.phone or "whatsapp",
+                        entity_type="tenancy",
+                        entity_id=tenancy.id,
+                        entity_name=action_data.get("tenant_name", ""),
+                        field="status+checkout_date",
+                        old_value=_old_status,
+                        new_value=f"exited {exit_date.isoformat()}",
+                        room_number=_cr_room.room_number if _cr_room else None,
+                        source="whatsapp",
+                        note=(
+                            f"Bot checkout checklist; refund Rs.{int(refund_amt):,}"
+                            + (" (deposit forfeited)" if deposit_forfeited else "")
+                            + f"; dues Rs.{int(action_data.get('auto_dues', 0)):,}"
+                            + f"; deductions Rs.{int(action_data.get('deductions', 0)):,}"
+                        ),
+                    ))
 
                 # Google Sheets write-back: TENANTS tab + month tab EXIT
                 gsheets_note = ""
@@ -2605,118 +2595,42 @@ async def resolve_pending_action(
 
         if step == "pick_tenant":
             try:
-                idx = int(ans) - 1
+                idx = int(ans.rstrip(".")) - 1
+                if idx < 0:
+                    raise IndexError
                 chosen = action_data["choices"][idx]
             except (ValueError, IndexError):
                 return "__KEEP_PENDING__Reply with the number of the tenant."
-            action_data["tenant_id"] = chosen["tenant_id"]
-            action_data["tenant_name"] = chosen["label"]
-            if action_data.get("room"):
-                # Validate room
-                new_room = await session.scalar(
-                    select(Room).where(Room.room_number == action_data["room"].upper(), Room.active == True)
-                )
-                if not new_room:
-                    return f"Room *{action_data['room']}* not found."
-                occ = await session.scalar(
-                    select(func.count(Tenancy.id)).where(
-                        Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active))
-                max_occ = int(new_room.max_occupancy or 1)
-                if (occ or 0) >= max_occ:
-                    return f"Room *{action_data['room']}* is *full* ({occ}/{max_occ} beds). Pick a different room."
-                action_data["step"] = "confirm"
-                action_data["room_id"] = new_room.id
-                action_data["room_number"] = new_room.room_number
-                await _save_pending(pending.phone, "ASSIGN_ROOM_STEP", action_data, [], session)
-                return (
-                    f"*Assign Room?*\n\n"
-                    f"Tenant: {chosen['label']}\n"
-                    f"Room: {new_room.room_number}\n\n"
-                    "Reply *yes* to confirm or *no* to cancel."
-                )
-            action_data["step"] = "ask_room"
-            await _save_pending(pending.phone, "ASSIGN_ROOM_STEP", action_data, [], session)
-            return f"Selected *{chosen['label']}*.\nWhich room? (e.g. 305-A)"
+            return await _assign_room_next(
+                pending.phone, chosen["tenancy_id"], action_data.get("room", ""), session,
+            )
 
         if step == "ask_room":
-            rm = re.search(r"(\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)", ans)
+            rm = re.search(r"([A-Za-z]?\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)", ans)
             if not rm:
-                return "__KEEP_PENDING__Enter a valid room number (e.g. 305-A):"
-            room_str = rm.group(1).upper()
-            from src.services.room_occupancy import check_room_bookable
-            new_room, err = await check_room_bookable(
-                session, room_str, date.today(), None,
-            )
-            if err:
-                return f"__KEEP_PENDING__{err} Pick a different room:"
-            action_data["room_id"] = new_room.id
-            action_data["room_number"] = new_room.room_number
-            action_data["step"] = "confirm"
-            await _save_pending(pending.phone, "ASSIGN_ROOM_STEP", action_data, [], session)
-            tenant_name = action_data.get("tenant_name", "Tenant")
-            return (
-                f"*Assign Room?*\n\n"
-                f"Tenant: {tenant_name}\n"
-                f"Room: {new_room.room_number}\n\n"
-                "Reply *yes* to confirm or *no* to cancel."
+                return "__KEEP_PENDING__Enter a valid room number (e.g. 305):"
+            return await _assign_room_next(
+                pending.phone, action_data["tenancy_id"], rm.group(1), session,
             )
 
         if step == "confirm":
             if is_affirmative(reply_text):
-                tenant_id = action_data["tenant_id"]
-                room_id = action_data["room_id"]
-                room_number = action_data["room_number"]
-
-                # Create new active tenancy
-                tenant = await session.get(Tenant, tenant_id)
-                if not tenant:
-                    return "Tenant not found in DB."
-
-                tenancy = Tenancy(
-                    tenant_id=tenant_id,
-                    room_id=room_id,
-                    checkin_date=date.today(),
-                    status=TenancyStatus.active,
-                    agreed_rent=Decimal("0"),  # will be set via rent flow
-                )
-                session.add(tenancy)
-                await session.flush()
-
-                # Audit log
-                from src.database.models import AuditLog
-                session.add(AuditLog(
+                from services.room_transfer import execute_room_transfer
+                result = await execute_room_transfer(
+                    tenancy_id=action_data["tenancy_id"],
+                    to_room_number=action_data["room_number"],
+                    new_rent=None,
+                    extra_deposit=0,
                     changed_by=pending.phone,
-                    entity_type="tenancy",
-                    entity_id=tenancy.id,
-                    entity_name=tenant.name,
-                    field="room_assigned",
-                    old_value=None,
-                    new_value=room_number,
-                    room_number=room_number,
                     source="whatsapp",
-                    note=f"Room assigned via ASSIGN_ROOM",
-                ))
-
-                # Google Sheet sync
-                gsheets_note = ""
-                try:
-                    from src.integrations.gsheets import add_tenant as gsheets_add
-                    gs_r = await gsheets_add(
-                        room_number=room_number, name=tenant.name, phone=tenant.phone,
-                        gender=tenant.gender or "", building="", floor="", sharing="",
-                        checkin=date.today().strftime("%d/%m/%Y"),
-                        agreed_rent=0, deposit=0, booking=0, maintenance=0, notes="Assigned via bot",
-                    )
-                    if gs_r.get("success"):
-                        gsheets_note = "\nSheet updated"
-                except Exception:
-                    pass
-
+                    session=session,
+                )
+                if not result.get("success"):
+                    return result["message"]
                 return (
-                    f"Room assigned — *{tenant.name}* ({tenant.phone})\n"
-                    f"Room: *{room_number}*\n"
-                    f"Check-in: {date.today().strftime('%d %b %Y')}\n"
-                    f"_Set rent via: change {tenant.name} rent to [amount]_{gsheets_note}"
+                    f"Room assigned — *{action_data.get('tenant_name', '')}*\n"
+                    f"Room: {result['from_room']} → *{result['to_room']}*\n"
+                    f"Check-in: {action_data.get('checkin', '')} (booking unchanged otherwise)"
                 )
             return "Room assignment cancelled."
 
@@ -2804,93 +2718,7 @@ async def resolve_pending_action(
         )
 
     if chosen is not None and pending.intent in ("CHECKOUT", "SCHEDULE_CHECKOUT"):
-        # Redirect to RECORD_CHECKOUT checklist instead of instant checkout
-        date_str = action_data.get("checkout_date", "")
-        try:
-            checkout_date_val = date.fromisoformat(date_str) if date_str else date.today()
-        except ValueError:
-            checkout_date_val = date.today()
-
-        # ── daywise_stays record (historical import) ──────────────────────
-        if chosen.get("record_type") == "daywise_stays":
-            return await _do_checkout_daywise(chosen["stay_id"], session, checkout_date=checkout_date_val)
-
-        # ── tenancy day-wise (bot-added, stay_type=daily) ──────────────────
-        tenancy_id = chosen.get("tenancy_id")
-        tenancy_check = await session.get(Tenancy, tenancy_id) if tenancy_id else None
-        if tenancy_check and tenancy_check.stay_type == StayType.daily:
-            return await _do_checkout(
-                tenancy_id=chosen["tenancy_id"],
-                tenant_name=chosen["label"],
-                checkout_date_val=checkout_date_val,
-                session=session,
-                changed_by=pending.phone or "whatsapp",
-            )
-
-        if checkout_date_val > date.today():
-            # Future date → schedule only, no checklist yet
-            return await _do_checkout(
-                tenancy_id=chosen["tenancy_id"],
-                tenant_name=chosen["label"],
-                checkout_date_val=checkout_date_val,
-                session=session,
-                changed_by=pending.phone or "whatsapp",
-            )
-
-        # Today/past → start checklist (monthly tenants only)
-        new_action = {
-            "step": "ask_cupboard_key",
-            "tenancy_id": chosen["tenancy_id"],
-            "tenant_name": chosen["label"],
-            "checkout_date": date_str,
-        }
-        await _save_pending(pending.phone, "RECORD_CHECKOUT", new_action, [], session)
-
-        # Show pre-checkout summary with auto-calculated dues + refund estimate
-        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
-        deposit  = int(tenancy.security_deposit or 0) if tenancy else 0
-        o_rent, o_maint = await _calc_outstanding_dues(chosen["tenancy_id"], session)
-        total_dues = int(o_rent) + int(o_maint)
-
-        # Notice timing & deposit forfeiture
-        nd = tenancy.notice_date if tenancy else None
-        deposit_forfeited = not is_deposit_eligible(nd)
-        if nd is None:
-            notice_line = "No notice given — *deposit forfeited*"
-        elif nd.day <= _NOTICE_BY_DAY:
-            notice_line = (
-                f"Notice: {nd.strftime('%d %b %Y')} (on time ✓) — deposit refundable"
-            )
-        else:
-            notice_line = (
-                f"Notice: {nd.strftime('%d %b %Y')} "
-                f"(after {_NOTICE_BY_DAY}th — must stay till end of next month) — *deposit forfeited*"
-            )
-
-        if deposit_forfeited:
-            refund_est = 0
-            refund_line = f"Estimated refund: *Rs.0* (deposit forfeited)"
-        else:
-            refund_est = max(0, deposit - total_dues)
-            refund_line = (
-                f"Estimated refund: *Rs.{refund_est:,}*"
-                + (f" (deposit Rs.{deposit:,} − dues Rs.{total_dues:,})" if total_dues > 0 else f" (full deposit Rs.{deposit:,})")
-            )
-
-        checkin_str = tenancy.checkin_date.strftime('%d %b %Y') if (tenancy and tenancy.checkin_date) else "—"
-
-        return (
-            f"*Checkout — {chosen['label']}*\n"
-            f"Check-in: {checkin_str}\n\n"
-            f"Deposit held: Rs.{deposit:,}\n"
-            f"Unpaid rent: Rs.{int(o_rent):,}\n"
-            f"Unpaid maintenance: Rs.{int(o_maint):,}\n"
-            f"{notice_line}\n"
-            f"{refund_line}\n\n"
-            "*Please complete the checklist:*\n\n"
-            "*Q1/5* Was the *cupboard/almirah key* returned?\n"
-            "Reply: *yes* or *no*"
-        )
+        return await _resolve_checkout_choice(chosen, action_data, pending.phone, session)
 
     if chosen is not None and pending.intent == "UPDATE_CHECKIN":
         if chosen.get("record_type") == "daywise_stays":
@@ -2905,6 +2733,7 @@ async def resolve_pending_action(
             tenant_name=chosen["label"],
             new_checkin_str=action_data.get("new_checkin", ""),
             session=session,
+            changed_by=pending.phone or "whatsapp",
         )
 
     if chosen is not None and pending.intent == "UPDATE_CHECKOUT_DATE":
@@ -2937,11 +2766,12 @@ async def resolve_pending_action(
                 tenant_name=chosen["label"],
                 new_checkout_str=new_checkout_str,
                 session=session,
+                changed_by=pending.phone or "whatsapp",
             )
         else:
             # No date provided — ask for it
             tenancy = await session.get(Tenancy, chosen["tenancy_id"])
-            old_checkout = tenancy.checkout_date if tenancy else None
+            old_checkout = (tenancy.checkout_date or tenancy.expected_checkout) if tenancy else None
             old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
             action_data["tenancy_id"] = chosen["tenancy_id"]
             action_data["tenant_name"] = chosen["label"]
@@ -2967,8 +2797,16 @@ async def resolve_pending_action(
             try:
                 notice_date_val = date.fromisoformat(action_data["notice_date"])
                 last_day_val = date.fromisoformat(action_data["last_day"])
+                _prev_notice = tenancy.notice_date
                 tenancy.notice_date = notice_date_val
                 tenancy.expected_checkout = last_day_val
+                _nroom = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+                await _audit_notice(
+                    session, tenancy,
+                    action_data.get("tenant_name") or chosen.get("label", "").split(" (Room")[0],
+                    _nroom.room_number if _nroom else "", pending.phone or "whatsapp",
+                    _prev_notice, given=True,
+                )
             except (ValueError, KeyError):
                 pass
             last_day_str = action_data.get("last_day", "")
@@ -3043,9 +2881,12 @@ async def resolve_pending_action(
         if not tenancy:
             return "Tenancy not found."
 
+        _prev_notice = tenancy.notice_date
         tenancy.notice_date = None
         tenancy.expected_checkout = None
         session.add(tenancy)
+        await _audit_notice(session, tenancy, tenant_name, room_number,
+                            pending.phone or "whatsapp", _prev_notice, given=False)
         await session.commit()
 
         from src.integrations.gsheets import record_notice
@@ -3138,15 +2979,25 @@ async def resolve_pending_action(
             session=session,
         )
 
+    if chosen is not None and pending.intent == "RENT_HISTORY_WHO":
+        from src.whatsapp.handlers.update_handler import rent_history_text
+        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+        tenant = await session.get(Tenant, chosen["tenant_id"])
+        if not tenancy or not tenant:
+            return "Tenant not found."
+        return await rent_history_text(tenant, tenancy, session)
+
     if chosen is not None and pending.intent == "GET_TENANT_NOTES":
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
         tenant = await session.get(Tenant, chosen["tenant_id"])
         if not tenancy or not tenant:
             return "Tenant not found."
         notes = tenancy.notes
+        _nr = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+        _rn = _nr.room_number if _nr else "-"
         if not notes or not notes.strip():
-            return f"*{tenant.name}* (Room {tenancy.room_id}) — no agreed terms on record."
-        return f"*{tenant.name}* — Room {tenancy.room_id}\nAgreed terms:\n{notes}"
+            return f"*{tenant.name}* (Room {_rn}) — no agreed terms on record."
+        return f"*{tenant.name}* — Room {_rn}\nAgreed terms:\n{notes}"
 
     if pending.intent == "DUPLICATE_CONFIRM":
         if chosen.get("seq") == 1:  # Log anyway
@@ -3443,7 +3294,10 @@ async def resolve_pending_action(
         )
 
     if pending.intent == "ROOM_TRANSFER_DEST":
-        to_room = reply_text.strip()
+        if is_negative(reply_text):
+            return "Room transfer cancelled."
+        _rm = re.search(r"\b([A-Za-z]?\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)\b", reply_text)
+        to_room = _rm.group(1) if _rm else ""
         if not to_room:
             return "__KEEP_PENDING__Reply with the destination room number."
         return await _finalize_room_transfer(
@@ -3580,7 +3434,7 @@ async def resolve_pending_action(
             "new_value": new_value,
             "tenant_name": tenant.name,
         }
-        if field == "phone":
+        if field in ("phone", "gender"):  # both live on tenants, not tenancies
             action_data_confirm["tenant_id"] = tenant.id
             action_data_confirm["table"] = "tenants"
 
@@ -3719,6 +3573,14 @@ async def resolve_pending_action(
         return "__KEEP_PENDING__Reply *Yes* to save the new tenant or *No* to cancel."
 
     if pending.intent == "RECEIPT_CONFIRM":
+        # Prompt shows "1. Yes / 2. No" — accept the digits as well as words.
+        # (Saved with choices=[] so the generic numbered re-prompt above
+        # doesn't swallow "yes" or a corrected tenant name.)
+        _rc = reply_text.strip().rstrip(".")
+        if _rc == "1":
+            reply_text = "yes"
+        elif _rc == "2":
+            reply_text = "no"
         if is_negative(reply_text):
             # User said No, cancel and ask them to send photo again with correct name
             return (
@@ -3728,7 +3590,7 @@ async def resolve_pending_action(
         if is_affirmative(reply_text):
             # User confirmed, attach the receipt
             from src.whatsapp.media_handler import download_whatsapp_media
-            from src.whatsapp.handlers.receipt_handler import _attach_receipt
+            from src.whatsapp.handlers.receipt_handler import _attach_receipt, receipt_attachable
 
             media_id = action_data.get("media_id")
             media_mime = action_data.get("media_mime")
@@ -3747,16 +3609,19 @@ async def resolve_pending_action(
                         Payment.tenancy_id == tenancy_id,
                         Payment.is_void == False,
                         Payment.receipt_url.is_(None),
+                        receipt_attachable(),
                     )
-                    .order_by(desc(Payment.created_at))
+                    # .desc() method, not sqlalchemy desc(): `desc` is a local
+                    # variable elsewhere in resolve_pending_action → UnboundLocalError.
+                    .order_by(Payment.created_at.desc())
                     .limit(1)
                 )
 
                 if not payment:
                     return (
-                        f"No pending payment found for {tenant_name} "
-                        f"(Room {room_number}) to attach this receipt to.\n\n"
-                        "Please log the payment first."
+                        f"No payment this month without a receipt for {tenant_name} "
+                        f"(Room {room_number}) — past months are closed.\n\n"
+                        "Record the payment in the *Kozzy app* first, then send the receipt again."
                     )
 
                 # Download and attach
@@ -3871,12 +3736,12 @@ async def resolve_pending_action(
                 # Audit log — note edits matter for accountability.
                 from src.database.models import AuditLog
                 session.add(AuditLog(
-                    changed_by=action_data.get("changed_by", "system"),
+                    changed_by=action_data.get("changed_by") or pending.phone,
                     entity_type="tenancy",
                     entity_id=tenancy.id,
                     entity_name=action_data["tenant_name"],
                     field="notes",
-                    old_value=None,
+                    old_value=action_data.get("current_notes") or None,
                     new_value=new_notes if notes_action == "update" else None,
                     room_number=action_data["room_number"],
                     source="whatsapp",
@@ -4036,6 +3901,10 @@ async def resolve_pending_action(
                     unique_hash=dedup,
                 )
                 session.add(contact)
+                await session.flush()
+                from src.whatsapp.role_service import CallerContext as _CC
+                _ops_audit(session, _CC(phone=pending.phone, role="", name=""), "contact",
+                           contact.id, name, "contact_created", None, f"{phone} ({category})")
                 notes_str = f"\n  _{notes}_" if notes else ""
                 return f"Contact saved — *{name}* ({category}) {phone}{notes_str}"
 
@@ -4051,6 +3920,10 @@ async def resolve_pending_action(
                     # Replace existing contact
                     old_contact = await session.get(PgContact, same_ids[choice - 1])
                     if old_contact:
+                        from src.whatsapp.role_service import CallerContext as _CC
+                        _ops_audit(session, _CC(phone=pending.phone, role="", name=""), "contact",
+                                   old_contact.id, old_contact.name, "contact_phone",
+                                   old_contact.phone, action_data["phone"])
                         old_contact.phone = action_data["phone"]
                         old_contact.category = action_data["category"]
                         old_contact.contact_for = action_data["category"]
@@ -4221,10 +4094,16 @@ async def resolve_pending_action(
                 if not contact:
                     return "Contact not found."
                 changes = []
+                from src.whatsapp.role_service import CallerContext as _CC
+                _actx = _CC(phone=pending.phone, role="", name="")
                 if action_data.get("new_phone"):
+                    _ops_audit(session, _actx, "contact", contact.id, contact.name,
+                               "contact_phone", contact.phone, action_data["new_phone"])
                     contact.phone = action_data["new_phone"]
                     changes.append(f"phone → {action_data['new_phone']}")
                 if action_data.get("new_notes"):
+                    _ops_audit(session, _actx, "contact", contact.id, contact.name,
+                               "contact_notes", contact.contact_for, action_data["new_notes"])
                     contact.contact_for = action_data["new_notes"]
                     changes.append(f"notes updated")
                 import hashlib
@@ -4238,14 +4117,15 @@ async def resolve_pending_action(
 
     if pending.intent == "BLACKLIST_ADD_REASON":
         reason = reply_text.strip()
-        if not reason or is_negative(reason):
+        if not reason or is_negative(reason) or reason.lower() in ("cancel", "stop", "abort"):
             pending.resolved = True
             return "Blacklist cancelled."
-        name = action_data.get("name", "")
+        name = action_data.get("name") or None
+        phone = action_data.get("phone") or None
         from src.services.blacklist import add_to_blacklist
-        await add_to_blacklist(session, name=name, reason=reason, added_by=pending.phone)
+        await add_to_blacklist(session, name=name, phone=phone, reason=reason, added_by=pending.phone)
         pending.resolved = True
-        return f"*{name}* has been added to the blacklist.\nReason: {reason}"
+        return f"*{name or phone}* has been added to the blacklist.\nReason: {reason}"
 
     if pending.intent == "BLACKLIST_REMOVE_CONFIRM":
         if is_negative(reply_text):
@@ -4255,7 +4135,7 @@ async def resolve_pending_action(
             bl_id = action_data.get("id")
             bl_name = action_data.get("name", "")
             from src.services.blacklist import remove_from_blacklist
-            await remove_from_blacklist(session, bl_id)
+            await remove_from_blacklist(session, bl_id, removed_by=pending.phone)
             pending.resolved = True
             return f"*{bl_name}* has been removed from the blacklist."
         return "__KEEP_PENDING__Reply *yes* to remove or *no* to cancel."
@@ -4291,6 +4171,41 @@ async def resolve_pending_action(
 
 
 # ── Checkout ──────────────────────────────────────────────────────────────────
+
+def _relative_exit_date(text: str) -> "Optional[date]":
+    """'tomorrow' / 'day after tomorrow' / 'end of (this|next) month' → date.
+    _extract_date_entity only reads calendar dates; a scheduled exit said in words
+    must never fall back to today (that runs an immediate checkout)."""
+    t = (text or "").lower()
+    today = date.today()
+    if re.search(r"day\s+after(?:\s+tomorrow)?|parso", t):
+        return today + timedelta(days=2)
+    if re.search(r"\btomorrow\b|\btmrw?\b|\bkal\b", t):
+        return today + timedelta(days=1)
+    m = re.search(r"end\s+of\s+(?:the\s+)?(this|next)?\s*month", t)
+    if m:
+        import calendar as _cal
+        y, mo = today.year, today.month
+        if m.group(1) == "next":
+            y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+        return date(y, mo, _cal.monthrange(y, mo)[1])
+    return None
+
+
+async def _schedule_checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """SCHEDULE_CHECKOUT — a future exit. Same confirm flow as CHECKOUT, but the
+    date is mandatory: resolve relative words, otherwise ask (never default to today)."""
+    if not entities.get("date") and not entities.get("_media_id"):
+        rel = _relative_exit_date(entities.get("_raw_message") or entities.get("description") or "")
+        if rel is None:
+            who = entities.get("name") or (f"Room {entities['room']}" if entities.get("room") else "the tenant")
+            return (
+                f"What date is *{who}* leaving?\n"
+                f"Say: *{who} leaving on 30 Nov*"
+            )
+        entities = {**entities, "date": rel.isoformat()}
+    return await _checkout_prompt(entities, ctx, session)
+
 
 async def _checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     # If an image was attached (e.g. physical checkout form photo), extract via OCR
@@ -4386,6 +4301,90 @@ async def _checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSes
     return _format_choices_message(search_term, choices, label)
 
 
+def _notice_line(nd: "Optional[date]") -> str:
+    """One staff-facing notice/deposit line — deposit rule is is_deposit_eligible (rules_financial 0b)."""
+    if nd is None:
+        return "No notice given — *deposit forfeited*"
+    dep = "deposit refundable" if is_deposit_eligible(nd) else "*deposit forfeited*"
+    if nd.day <= _NOTICE_BY_DAY:
+        return f"Notice: {nd.strftime('%d %b %Y')} (on time) — {dep}"
+    return (f"Notice: {nd.strftime('%d %b %Y')} (after {_NOTICE_BY_DAY}th — must stay till end of "
+            f"next month) — {dep}")
+
+
+async def _resolve_checkout_choice(chosen: dict, action_data: dict, phone: str,
+                                   session: AsyncSession) -> str:
+    """Tenant picked for CHECKOUT / SCHEDULE_CHECKOUT. Single source for both the legacy
+    cascade and the conversation framework (conversation/handlers/checkout.py).
+    Future date → schedule; day-stay → immediate exit; today/past monthly → checklist."""
+    date_str = action_data.get("checkout_date", "")
+    try:
+        checkout_date_val = date.fromisoformat(date_str) if date_str else date.today()
+    except ValueError:
+        checkout_date_val = date.today()
+
+    # ── daywise_stays record (historical import) ──────────────────────
+    if chosen.get("record_type") == "daywise_stays":
+        return await _do_checkout_daywise(chosen["stay_id"], session, checkout_date=checkout_date_val)
+
+    tenancy_id = chosen.get("tenancy_id")
+    tenancy = await session.get(Tenancy, tenancy_id) if tenancy_id else None
+    if not tenancy:
+        return "Tenancy record not found."
+
+    # day-stay tenancy, or a future date (schedule only) → no checklist
+    if tenancy.stay_type == StayType.daily or checkout_date_val > date.today():
+        return await _do_checkout(
+            tenancy_id=tenancy_id,
+            tenant_name=chosen["label"],
+            checkout_date_val=checkout_date_val,
+            session=session,
+            changed_by=phone or "whatsapp",
+        )
+
+    # Today/past → start checklist (monthly tenants only). exit_date carries the
+    # date the staff said ("checkout X on 5 Oct") — RECORD_CHECKOUT reads exit_date.
+    new_action = {
+        "step": "ask_cupboard_key",
+        "tenancy_id": tenancy_id,
+        "tenant_name": chosen["label"],
+        "checkout_date": date_str,
+        "exit_date": checkout_date_val.isoformat(),
+    }
+    await _save_pending(phone, "RECORD_CHECKOUT", new_action, [], session)
+
+    deposit = int(tenancy.security_deposit or 0)
+    maintenance = int(tenancy.maintenance_fee or 0)
+    o_rent, o_maint = await _calc_outstanding_dues(tenancy_id, session)
+    total_dues = int(o_rent) + int(o_maint)
+
+    if not is_deposit_eligible(tenancy.notice_date):
+        refund_line = "Estimated refund: *Rs.0* (deposit forfeited)"
+    else:
+        refund_est = max(0, deposit - maintenance - total_dues)
+        refund_line = (
+            f"Estimated refund: *Rs.{refund_est:,}* (deposit Rs.{deposit:,}"
+            + (f" − maintenance Rs.{maintenance:,}" if maintenance else "")
+            + (f" − dues Rs.{total_dues:,}" if total_dues else "")
+            + ")"
+        )
+
+    checkin_str = tenancy.checkin_date.strftime('%d %b %Y') if tenancy.checkin_date else "—"
+    return (
+        f"*Checkout — {chosen['label']}*\n"
+        f"Check-in: {checkin_str}\n"
+        f"Exit date: {checkout_date_val.strftime('%d %b %Y')}\n\n"
+        f"Deposit held: Rs.{deposit:,}\n"
+        f"Unpaid rent: Rs.{int(o_rent):,}\n"
+        f"Unpaid maintenance: Rs.{int(o_maint):,}\n"
+        f"{_notice_line(tenancy.notice_date)}\n"
+        f"{refund_line}\n\n"
+        "*Please complete the checklist:*\n\n"
+        "*Q1/5* Was the *cupboard/almirah key* returned?\n"
+        "Reply: *yes* or *no*"
+    )
+
+
 async def _do_checkout(
     tenancy_id: int,
     tenant_name: str,
@@ -4406,7 +4405,18 @@ async def _do_checkout(
 
     if checkout_date_val > date.today():
         # Future date → schedule only, tenancy stays active
+        _old_exp = tenancy.expected_checkout
         tenancy.expected_checkout = checkout_date_val
+        _sched_room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+        from src.services.audit import write_audit_entry as _wae
+        await _wae(
+            session=session, changed_by=changed_by, entity_type="tenancy",
+            entity_id=tenancy_id, entity_name=tenant_name, field="expected_checkout",
+            old_value=_old_exp.isoformat() if _old_exp else None,
+            new_value=checkout_date_val.isoformat(),
+            room_number=_sched_room.room_number if _sched_room else None,
+            source="whatsapp", note="Checkout scheduled via bot",
+        )
         await session.commit()
         # Gap A fix: propagate the expected_checkout to the sheet so the
         # Event / Notice Date columns reflect the scheduled exit instantly
@@ -4446,15 +4456,8 @@ async def _do_checkout(
         notice_warn = ""
     elif not tenancy.notice_date:
         notice_warn = "\n⚠️ No notice on record — deposit forfeited."
-    elif tenancy.notice_date.day > _NOTICE_BY_DAY:
-        notice_warn = (
-            f"\n⚠️ Notice given on {tenancy.notice_date.strftime('%d %b')} "
-            f"(after {_NOTICE_BY_DAY}th) — must stay till end of next month. *Deposit forfeited.*"
-        )
     else:
-        notice_warn = (
-            f"\n✅ Notice was on time ({tenancy.notice_date.strftime('%d %b')}) — deposit eligible for refund."
-        )
+        notice_warn = "\n" + _notice_line(tenancy.notice_date)
 
     prorate_note = ""
 
@@ -4538,64 +4541,8 @@ async def _do_checkout(
             f"{gsheets_note}"
         )
 
-    # ── Checkout confirmation WhatsApp template (fire-and-forget) ──
-    # Template: cozeevo_checkout_confirmation — 5 vars
-    # Falls back to free-text inside the 24-hr session window if PENDING.
-    try:
-        tenant_obj = await session.get(Tenant, tenancy.tenant_id)
-        tenant_phone = (tenant_obj.phone or "").strip() if tenant_obj else ""
-        if tenant_phone:
-            phone_wa = tenant_phone.lstrip("+").replace(" ", "")
-            if not phone_wa.startswith("91"):
-                phone_wa = "91" + phone_wa
-            room_str = room_obj.room_number if room_obj else "-"
-            date_str = checkout_date_val.strftime("%d %b %Y")
-            if net > 0:
-                refund_str = f"Rs.{int(net):,}"
-                balance_str = "Rs.0 (settled)"
-            elif net == 0:
-                refund_str = "Rs.0"
-                balance_str = "Rs.0 (settled)"
-            else:
-                refund_str = "Rs.0"
-                balance_str = f"Rs.{int(abs(net)):,}"
-
-            async def _send_checkout_msg() -> None:
-                try:
-                    from src.whatsapp.webhook_handler import (
-                        _send_whatsapp_template, _send_whatsapp,
-                    )
-                    tpl_sent = await _send_whatsapp_template(
-                        phone_wa,
-                        "cozeevo_checkout_confirmation",
-                        [tenant_name, room_str, date_str, refund_str, balance_str],
-                    )
-                    if not tpl_sent:
-                        await _send_whatsapp(
-                            phone_wa,
-                            f"Hi {tenant_name}, your check-out is recorded.\n\n"
-                            f"Room: {room_str}\n"
-                            f"Checkout date: {date_str}\n"
-                            f"Deposit refund: {refund_str}\n"
-                            f"Final balance: {balance_str}\n\n"
-                            f"Thank you for staying with Cozeevo — it was a pleasure having you. "
-                            f"If you enjoyed your stay, we'd love a quick review and a recommendation "
-                            f"to friends. And whenever you're in town again, our doors are open to "
-                            f"welcome you back.",
-                            intent="CHECKOUT_CONFIRMATION",
-                        )
-                except Exception as _e:
-                    import logging as _log
-                    _log.getLogger(__name__).warning(
-                        "Checkout confirmation send failed: %s", _e
-                    )
-
-            asyncio.create_task(_send_checkout_msg())
-    except Exception as _e:
-        import logging as _log
-        _log.getLogger(__name__).warning(
-            "Checkout confirmation prep failed: %s", _e
-        )
+    # No message to the tenant (rules_no_tenant_comms) — staff share the settlement
+    # themselves. Was: cozeevo_checkout_confirmation template + free-form fallback.
 
     return (
         f"*Checkout recorded — {tenant_name}*\n"
@@ -4606,7 +4553,8 @@ async def _do_checkout(
         "Next steps:\n"
         "1. Collect room keys\n"
         "2. Process deposit refund → *refund [amount] to [Name]*"
-        f"{gsheets_note}"
+        f"{gsheets_note}\n\n"
+        "_Tenant was not messaged — share the settlement with them yourself._"
     )
 
 
@@ -4653,6 +4601,43 @@ def _calc_prorate(amount: Decimal, day_of_month: int, days_in_month: int) -> int
 
 # ── Notice given ──────────────────────────────────────────────────────────────
 
+async def _audit_notice(session: AsyncSession, tenancy: "Tenancy", tenant_name: str,
+                        room_number: str, changed_by: str, old_notice, given: bool) -> None:
+    """audit_log row for notice given / withdrawn. Given uses field=status/on_notice —
+    the activity feed renders that as "Notice given"."""
+    from src.services.audit import write_audit_entry as _wae
+    if given:
+        await _wae(
+            session=session, changed_by=changed_by, entity_type="tenancy",
+            entity_id=tenancy.id, entity_name=tenant_name, field="status",
+            old_value="active", new_value="on_notice", room_number=room_number,
+            source="whatsapp",
+            note=(f"notice_date {old_notice.isoformat() if old_notice else '-'} -> "
+                  f"{tenancy.notice_date.isoformat() if tenancy.notice_date else '-'}; "
+                  f"expected_checkout {tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else '-'}"),
+        )
+    else:
+        await _wae(
+            session=session, changed_by=changed_by, entity_type="tenancy",
+            entity_id=tenancy.id, entity_name=tenant_name, field="notice_date",
+            old_value=old_notice.isoformat() if old_notice else None, new_value=None,
+            room_number=room_number, source="whatsapp",
+            note="Notice withdrawn via bot — expected_checkout cleared",
+        )
+
+
+def _notice_deposit_note(notice_date_val: date, last_day: date) -> str:
+    """Staff text for a new notice. Deposit rule = is_deposit_eligible (rules_financial 0b):
+    any notice keeps the deposit refundable; late notice only pushes the exit a month."""
+    vac = f"Vacate date: *{last_day.strftime('%d %b %Y')}*"
+    dep = ("deposit refundable on vacate" if is_deposit_eligible(notice_date_val)
+           else "*Deposit forfeited.*")
+    if notice_date_val.day <= _NOTICE_BY_DAY:
+        return f"On time — {dep}.\n{vac}"
+    return (f"After {_NOTICE_BY_DAY}th — must stay till end of next month, full month's rent required; "
+            f"{dep}.\n{vac}")
+
+
 async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     name = entities.get("name", "").strip()
     room = entities.get("room", "").strip()
@@ -4697,14 +4682,7 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
     else:
         last_day = _calc_notice_last_day(notice_date_val)
 
-    # Deposit eligibility based on notice timing
-    if notice_date_val.day <= _NOTICE_BY_DAY:
-        deposit_note = f"On time — deposit eligible for refund on vacate.\nVacate date: *{last_day.strftime('%d %b %Y')}*"
-    else:
-        deposit_note = (
-            f"After {_NOTICE_BY_DAY}th — must stay till end of next month, full month's rent required.\n"
-            f"Vacate date: *{last_day.strftime('%d %b %Y')}*. *Deposit forfeited.*"
-        )
+    deposit_note = _notice_deposit_note(notice_date_val, last_day)
 
     assumed_note = ""
     if date_assumed:
@@ -4741,6 +4719,8 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
 
         tenancy.notice_date = notice_date_val
         tenancy.expected_checkout = last_day
+        await _audit_notice(session, tenancy, tenant.name, room_obj.room_number,
+                            ctx.phone, None, given=True)
 
         gsheets_note = ""
         try:
@@ -4929,9 +4909,10 @@ async def _checkin_arrival(entities: dict, ctx: CallerContext, session: AsyncSes
             )
             .order_by(Tenancy.checkin_date.asc())
         )
+        from src.whatsapp.handlers._shared import surname_resembles
         seen_tenants: set = set()
         for row in result.all():
-            if row[0].id not in seen_tenants:
+            if row[0].id not in seen_tenants and surname_resembles(name, row[0].name):
                 seen_tenants.add(row[0].id)
                 rows.append(row)
 
@@ -5021,6 +5002,7 @@ async def _do_update_checkin(
     tenant_name: str,
     new_checkin_str: str,
     session: AsyncSession,
+    changed_by: str = "whatsapp",
 ) -> str:
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
@@ -5042,6 +5024,17 @@ async def _do_update_checkin(
 
     from src.services.rent_schedule import recalc_checkin_month_rs
     await recalc_checkin_month_rs(session, tenancy)
+
+    from src.services.audit import write_audit_entry as _wae
+    _ci_room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+    await _wae(
+        session=session, changed_by=changed_by, entity_type="tenancy",
+        entity_id=tenancy.id, entity_name=tenant_name, field="checkin_date",
+        old_value=old_checkin.isoformat() if old_checkin else None,
+        new_value=new_checkin.isoformat(),
+        room_number=_ci_room.room_number if _ci_room else None,
+        source="whatsapp", note="Check-in date corrected via bot",
+    )
 
     await session.commit()
 
@@ -5186,7 +5179,7 @@ async def _update_checkout_date(entities: dict, ctx: CallerContext, session: Asy
                 new_checkout = date.fromisoformat(date_str)
             except ValueError:
                 return "Couldn't parse that date. Use: *20 Apr* or *20/04/2026*"
-            old_checkout = tenancy.checkout_date
+            old_checkout = tenancy.checkout_date or tenancy.expected_checkout
             old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
             return (
                 f"Update checkout for *{tenant.name}* (Room {room_obj.room_number})?\n\n"
@@ -5197,7 +5190,7 @@ async def _update_checkout_date(entities: dict, ctx: CallerContext, session: Asy
         else:
             # No date provided — ask for it
             await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE_ASK", action_data, choices, session)
-            old_checkout = tenancy.checkout_date
+            old_checkout = tenancy.checkout_date or tenancy.expected_checkout
             old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
             return (
                 f"*{tenant.name}* (Room {room_obj.room_number})\n"
@@ -5216,6 +5209,7 @@ async def _do_update_checkout_date(
     tenant_name: str,
     new_checkout_str: str,
     session: AsyncSession,
+    changed_by: str = "whatsapp",
 ) -> str:
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
@@ -5232,9 +5226,23 @@ async def _do_update_checkout_date(
             f"checkin {tenancy.checkin_date.strftime('%d %b %Y')}."
         )
 
-    old_checkout = tenancy.checkout_date
+    # Still living here (active / no_show) -> this is the PLANNED exit (expected_checkout).
+    # checkout_date is the actual exit and is only set once the tenancy is exited —
+    # writing it on an active tenancy made them look checked-out everywhere.
+    _field = "checkout_date" if tenancy.status == TenancyStatus.exited else "expected_checkout"
+    old_checkout = getattr(tenancy, _field)
     old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
-    tenancy.checkout_date = new_checkout
+    setattr(tenancy, _field, new_checkout)
+    from src.services.audit import write_audit_entry as _wae
+    _co_room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+    await _wae(
+        session=session, changed_by=changed_by, entity_type="tenancy",
+        entity_id=tenancy.id, entity_name=tenant_name, field=_field,
+        old_value=old_checkout.isoformat() if old_checkout else None,
+        new_value=new_checkout.isoformat(),
+        room_number=_co_room.room_number if _co_room else None,
+        source="whatsapp", note="Checkout date changed via bot",
+    )
     await session.commit()
 
     # Push Checkout Date to sheet — dashboard occupancy / exit KPIs read this column.
@@ -5836,9 +5844,18 @@ async def _extract_tenant_from_image(
 
 
 async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # New tenants go through the booking + tenant form flow (START_ONBOARDING) —
+    # the old free-text form below is retired. With a phone number in the message,
+    # start that flow directly.
+    raw = entities.get("_raw_message") or entities.get("description", "") or ""
+    if re.search(r"(?<!\d)[6-9]\d{9}(?!\d)", raw):
+        return await _start_onboarding(entities, ctx, session)
     return (
-        "To add a new tenant, use the onboarding form at app.getkozzy.com/onboarding\n\n"
-        "The form handles KYC, room assignment, and updates all systems automatically."
+        "To add a new tenant, send:\n"
+        "*start onboarding [Name] [phone]*\n"
+        "Example: *start onboarding Rahul 9876543210*\n\n"
+        "I'll ask for room, rent, deposit and check-in date, create the booking, and give you "
+        "the tenant form link to forward (KYC + agreement). Or use the Kozzy app → Vacant beds → Book."
     )
 
     # ── DEPRECATED — kept for reference only — do not re-enable ──────────
@@ -6342,22 +6359,22 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
 
 
 async def _add_partner(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # Bot access is a hardcoded allowlist (role_service._HARDCODED_ROLES) — it cannot be
+    # changed from chat. Say so instead of prompting for a command that does nothing.
     if ctx.role != "admin":
-        return "Only the admin can add partners."
+        return "Bot access can only be changed by the admin, and it is set in code — not from WhatsApp."
     return (
-        "*Add a partner*\n\n"
-        "Send: *add partner +91XXXXXXXXXX [Name]*\n"
-        "Example: *add partner +917001234567 Suresh*"
+        "Bot access can't be added from WhatsApp.\n"
+        "The allowed numbers are set in code (src/whatsapp/role_service.py); "
+        "add the number there and deploy."
     )
 
 
 async def _reminder_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # Rule: no automated or scheduled messages to anyone — so no reminder is created.
     return (
-        "*Set a reminder*\n\n"
-        "Format: *remind [Name] [when]*\n"
-        "Examples:\n"
-        "• remind Raj tomorrow about rent\n"
-        "• remind all pending tenants on 3rd"
+        "Reminders are switched off — the bot does not send scheduled messages.\n"
+        "Nothing was set. Use a phone reminder, or check dues in the Kozzy app."
     )
 
 
@@ -6451,6 +6468,8 @@ async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -
 
     prop.wifi_floor_map = floor_map
     flag_modified(prop, "wifi_floor_map")
+    _ops_audit(session, ctx, "property", prop.id, f"{block.capitalize()} wifi {target_ssid}",
+               "wifi_password", None, "changed")
     await session.commit()
     return f"✅ WiFi updated\nNetwork: `{target_ssid}`\nNew password: `{new_pw}`"
 
@@ -6458,40 +6477,61 @@ async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     header = bot_intro(await is_first_time_today(ctx.phone, session), ctx.name, ctx.role)
     first = ctx.name.split()[0] if ctx.name else "there"
-    return (
-        f"{header}"
-        f"Type naturally or try these, {first}:\n\n"
-        "*Rent & Payments*\n"
-        "  _collect rent_ — step-by-step\n"
-        "  _Raj paid 14000 cash_ — quick log\n"
-        "  _who owes_ — unpaid list\n"
-        "  _report_ — monthly summary\n"
-        "  _void payment Raj_ — reverse entry\n\n"
-        "*Check-in & Checkout*\n"
-        "  _add tenant_ — new check-in\n"
-        "  _add tenant_ + photo — auto-extract from form\n"
-        "  _checkout_ + photo — checkout via form\n"
-        "  _checkout Raj_ — manual exit process\n"
-        "  _Raj gave notice_ — record notice\n\n"
-        "*Rooms & Tenants*\n"
-        "  _Raj balance_ — payment history\n"
-        "  _room 422_ — who's in this room\n"
-        "  _vacant rooms_ — all empty beds\n"
-        "  _transfer Raj to 305_ — room change\n\n"
-        "*Expenses & Complaints*\n"
-        "  _log EB bill_ + photo — log expense\n"
-        "  _no water room 415_ — register complaint\n"
-        "  _plumber fixed 201_ — update complaint\n\n"
-        "*Other*\n"
-        "  _remind unpaid_ — send reminders\n"
-        "  _rules_ — PG rules & regulations\n"
-        "  _cancel_ — stop any form mid-way"
-    )
+    return f"{header}Type naturally or try these, {first}:\n\n" + _ops_menu(ctx)
 
 
 async def _more_menu(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     first = ctx.name.split()[0] if ctx.name else "there"
-    return f"Here's everything you can do, {first}. 👇"
+    return f"Everything you can do on WhatsApp, {first}:\n\n" + _ops_menu(ctx)
+
+
+APP_ONLY_LINE = (
+    "*Payments, dues, expenses, reports & reminders* are in the *Kozzy app* — not on WhatsApp.\n"
+    "Send a receipt/bill photo here to save it to the archive."
+)
+
+
+def _ops_menu(ctx: CallerContext) -> str:
+    """The WhatsApp command menu — ONLY commands that work over WhatsApp for this caller.
+    Finance intents are blocked in gatekeeper (Kozzy app); chit lines show only for
+    CHIT_PHONES; bot-access/reminder commands are not listed (they can't be done here).
+    Every example is a case in tests/sandbox/cases/ops.json — keep the two in sync."""
+    from src.services.chit_payments import phone_allowed as _chit_ok
+    parts = [
+        "*Check-in & Checkout*\n"
+        "  _add tenant_ — check-in form link\n"
+        "  _checkout Raj_ — exit process\n"
+        "  _Raj gave notice_ — record notice",
+        "*Rooms*\n"
+        "  _room 422_ — who's in this room\n"
+        "  _vacant rooms_ — empty beds\n"
+        "  _transfer Raj to 305_ — room change",
+        "*Complaints*\n"
+        "  _no water room 512_ — log a complaint\n"
+        "  _show complaints_ — open list\n"
+        "  _resolve complaint 512_ — close it",
+        "*Staff, Vendors & WiFi*\n"
+        "  _add staff Ravi | Cook | 9000_ — new staff\n"
+        "  _staff Ravi room G05_ — staff room\n"
+        "  _staff Ravi exit_ — staff left\n"
+        "  _plumber contact_ — find a vendor\n"
+        "  _add contact_ — save a vendor\n"
+        "  _wifi password_ — WiFi details\n"
+        "  _Raj vacation from 15 Oct to 20 Oct_ — log vacation",
+    ]
+    if _chit_ok(ctx.phone):
+        parts.append(
+            "*Chits*\n"
+            "  _chit summary_ — register\n"
+            "  _paid boobalan chit 5L today_ — log\n"
+            "  _void chit 6_ — void an entry"
+        )
+    parts.append(
+        "*Other*\n"
+        "  _rules_ — PG rules\n"
+        "  _cancel_ — stop any form mid-way"
+    )
+    return "\n\n".join(parts) + "\n\n" + APP_ONLY_LINE
 
 
 async def _rules(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -6529,21 +6569,40 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
     Works for both monthly tenants and day-wise guests."""
     name   = entities.get("name", "").strip()
     to_room = entities.get("room", "").strip()
+    desc = entities.get("_raw_message", "") or entities.get("description", "") or ""
 
-    # Fallback: "transfer Arjun to 307" → room parsed as amount, extract via regex
-    if not to_room:
-        desc = entities.get("description", "") or entities.get("_raw_message", "")
-        _to_match = re.search(r"(?:to|->|→)\s*(?:room\s*)?(\d{2,4}[A-Za-z]?)", desc, re.I)
-        if _to_match:
-            to_room = _to_match.group(1)
-
+    # The destination is the room after "to/into" — prefer it over the entity,
+    # which may hold the SOURCE room ("move room 314 tenant to 401").
+    _to_match = re.search(r"(?:\bto|\binto|->|→)\s*(?:room\s*)?([A-Za-z]?\d{2,4}[A-Za-z]?)\b", desc, re.I) \
+        or re.search(r"\b(?:change|transfer|shift|move)\s+(?:to\s+)?(?:room\s+)?([A-Za-z]?\d{2,4}[A-Za-z]?)\s*$", desc, re.I) \
+        or re.search(r"\b([A-Za-z]?\d{2,4}[A-Za-z]?)\s+(?:mein|me|main)\s+(?:move|shift|transfer)", desc, re.I)
+    if _to_match:
+        to_room = _to_match.group(1)
+    # Source room given instead of a name: "move room 314 tenant to 401", "from 314 to 401"
+    _src_match = re.search(r"\b(?:from\s+(?:room\s+)?|room\s+)([A-Za-z]?\d{2,4}[A-Za-z]?)\b(?!\s*$)", desc, re.I)
+    src_room = _src_match.group(1) if _src_match and _src_match.group(1) != to_room else ""
     if not name:
+        # "vidya dutta room change 401" / "change Vidya's room to 401" / "transfer Vidya Dutta"
+        _nm = re.search(r"^\s*(?:please\s+)?([a-z][a-z.]*(?:\s+[a-z][a-z.]*){0,2}?)\s+(?:ka\s+|ki\s+)?room\s+(?:change|transfer|shift)\b", desc, re.I) \
+            or re.search(r"\bchange\s+([a-z][a-z.]*(?:\s+[a-z][a-z.]*){0,2}?)'s?\s+room\b", desc, re.I) \
+            or re.search(r"^\s*(?:transfer|shift|move|relocate)\s+([a-z][a-z.]*(?:\s+[a-z][a-z.]*){0,2})\s*$", desc, re.I)
+        if _nm:
+            name = _nm.group(1).strip()
+    name = re.sub(r"^(?:please|pls|plz|kindly)\s+", "", name, flags=re.I).strip()
+    if name and re.fullmatch(r"(?:room|tenant|from|the|of|please)(?:\s+\w+)?", name, re.I):
+        name = ""
+
+    if not name and src_room:
+        rows = await _find_active_tenants_by_room(src_room, session)
+        if not rows:
+            return f"No active tenant found in Room *{src_room}*."
+    elif not name:
         return (
             "Who should be moved and to which room?\n"
             "Say: *move Raj to room 305*"
         )
-
-    rows = await _find_active_tenants_by_name(name, session)
+    else:
+        rows = await _find_active_tenants_by_name(name, session)
     if not rows:
         suggestions = await _find_similar_names(name, session)
         return _format_no_match_message(name, suggestions)
@@ -6585,49 +6644,22 @@ async def _finalize_room_transfer(
     if not tenancy:
         return "Tenancy record not found."
 
-    new_room = await session.scalar(
-        select(Room).where(Room.room_number == to_room.upper(), Room.active == True)
-    )
-    if not new_room:
-        return f"Room *{to_room}* not found. Check the room number and try again."
-
-    occupied_rows = (await session.execute(
-        select(Tenant.name, Tenant.phone, Tenancy.id).where(
-            Tenancy.room_id == new_room.id,
-            Tenancy.status == TenancyStatus.active,
-            Tenancy.tenant_id == Tenant.id,
-            Tenancy.id != tenancy.id,
-        )
-    )).all()
-
-    # Day-wise stays overlapping today also occupy beds in the destination room.
-    _today = date.today()
-    daywise_rows = (await session.execute(
-        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date)
-        .join(Tenant, Tenant.id == Tenancy.tenant_id)
-        .where(
-            Tenancy.room_id == new_room.id,
-            Tenancy.stay_type == StayType.daily,
-            Tenancy.checkin_date <= _today,
-            Tenancy.checkout_date >= _today,
-            Tenancy.status == TenancyStatus.active,
-        )
-    )).all()
-
-    max_occ = int(new_room.max_occupancy or 1)
-    occ_total = len(occupied_rows) + len(daywise_rows)
-    free_beds = max_occ - occ_total
-    if free_beds <= 0:
-        occ_lines = "\n".join(f"  - {r[0]} ({r[1]})" for r in occupied_rows)
-        dw_lines = "\n".join(f"  - {r[0]} (day-stay till {r[2]})" for r in daywise_rows)
-        all_lines = "\n".join(x for x in (occ_lines, dw_lines) if x)
+    # One capacity gate for bot + PWA (premium / day-stay / no-show aware).
+    from services.room_transfer import check_transfer_destination
+    from src.services.room_occupancy import get_room_occupants
+    new_room, dest_err = await check_transfer_destination(session, tenancy, to_room)
+    if dest_err:
+        if new_room is None:
+            return f"Room *{to_room}* not found. Check the room number and try again."
+        if dest_err.startswith("Tenant is already"):
+            return f"*{tenant_name}* is already in Room *{new_room.room_number}*."
         return (
-            f"Room *{to_room}* is *full* ({occ_total}/{max_occ} beds):\n{all_lines}\n\n"
-            f"Options:\n"
-            f"*1.* Checkout one of them first, then retry\n"
-            f"*2.* Pick a different room\n\n"
-            f"_I can't auto-swap yet — checkout the occupant first, then move {tenant_name}._"
+            f"{dest_err}\n\n"
+            f"Pick a different room, or checkout / move an occupant first, then move {tenant_name}."
         )
+    max_occ = int(new_room.max_occupancy or 1)
+    _occ = await get_room_occupants(session, new_room)
+    occupied_rows = [(t.name, t.phone, tc.id) for t, tc in _occ.tenancies if tc.id != tenancy.id]
 
     current_rent = int(tenancy.agreed_rent or 0)
     current_deposit = int(tenancy.security_deposit or 0)
@@ -6787,85 +6819,37 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     elif "hulk" in desc:
         building_filter = "HULK"
 
+    # Whole words only — substring matching made "how MANy beds are empty"
+    # a male-only query.
     gender_filter = None
-    if any(w in desc for w in ("female", "girl", "woman", "women", "ladies", "lady")):
+    if re.search(r"\b(?:female|girls?|wom[ae]n|ladies|lady)\b", desc):
         gender_filter = "female"
-    elif any(w in desc for w in ("male", "boy", "man", "men", "gents")):
+    elif re.search(r"\b(?:male|boys?|m[ae]n|gents?)\b", desc):
         gender_filter = "male"
 
     if gender_filter:
         return await _query_beds_by_gender(gender_filter, building_filter, session)
 
-    # ── Get all revenue rooms with their tenant counts ────────────────────
-    room_q = (
+    # ── Bed state per room — canonical (src/services/occupancy.py) ────────
+    from src.services.occupancy import get_bed_breakdown
+    bb = (await get_bed_breakdown(session)).subset(building_filter)
+    room_objs = {r.id: (r, pn) for r, pn in (await session.execute(
         select(Room, Property.name)
         .join(Property, Property.id == Room.property_id)
-        .where(Room.active == True, Room.is_staff_room == False)
-    )
-    if building_filter:
-        room_q = room_q.where(Property.name.ilike(f"%{building_filter}%"))
-    room_q = room_q.order_by(Property.name, Room.room_number)
-    all_rows = (await session.execute(room_q)).all()
-
-    # Count active + no-show tenants per room (no-shows are booked, bed reserved)
-    tenant_q = (
-        select(Tenancy.room_id, func.count().label("cnt"))
-        .join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
-            Tenancy.room_id.isnot(None),
-            Room.is_staff_room == False,
-        )
-        .group_by(Tenancy.room_id)
-    )
-    tenant_counts = {row[0]: row[1] for row in (await session.execute(tenant_q)).all()}
-
-    # Count day-wise guests currently occupying beds (checkin <= today <= checkout)
-    from datetime import date
-    today = date.today()
-    dw_q = (
-        select(Tenancy.room_id, func.count().label("cnt"))
-        .where(
-            Tenancy.stay_type == StayType.daily,
-            Tenancy.checkin_date <= today,
-            Tenancy.checkout_date >= today,
-            Tenancy.status == TenancyStatus.active,
-            Tenancy.room_id.isnot(None),
-        )
-        .group_by(Tenancy.room_id)
-    )
-    daywise_counts = {row[0]: row[1] for row in (await session.execute(dw_q)).all()}
-
-    for rid, cnt in daywise_counts.items():
-        tenant_counts[rid] = tenant_counts.get(rid, 0) + cnt
-
-    # Premium rooms: 1 person = BOTH beds booked, second bed NOT sellable
-    premium_room_ids = {row[0] for row in (await session.execute(
-        select(Tenancy.room_id).where(
-            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
-            Tenancy.room_id.isnot(None),
-            Tenancy.sharing_type == "premium",
-        )
+        .where(Room.id.in_(list(bb.rooms.keys()) or [-1]))
     )).all()}
 
-    # For premium rooms, set occupied = max_occupancy (room is full, no free beds)
-    for r, _ in all_rows:
-        if r.id in premium_room_ids:
-            tenant_counts[r.id] = r.max_occupancy or 1
-
     # ── Build list of rooms with empty beds ───────────────────────────────
-    total_beds = sum(r.max_occupancy or 1 for r, _ in all_rows)
-
+    total_beds = bb.total_beds
     rooms_with_empty = []
-    for r, prop in all_rows:
-        max_occ = r.max_occupancy or 1
-        occupied = tenant_counts.get(r.id, 0)
-        free = max_occ - occupied
-        if free > 0:
-            rooms_with_empty.append((r, prop, occupied, free))
+    for rid, rb in sorted(bb.rooms.items(),
+                          key=lambda kv: (kv[1].building, kv[1].room_number)):
+        if rb.free > 0 and rid in room_objs:
+            r, prop = room_objs[rid]
+            rooms_with_empty.append((r, prop, rb.checked_in + rb.noshow, rb.free))
 
-    total_empty = sum(f for _, _, _, f in rooms_with_empty)
-    total_occupied = total_beds - total_empty
+    total_empty = bb.vacant
+    total_occupied = bb.checked_in
 
     bld = f" in *{building_filter}*" if building_filter else ""
     if not rooms_with_empty:
@@ -6894,10 +6878,14 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     hulk = blocks.get("HULK", {"rooms": 0, "beds": 0})
 
     lines = [
-        f"🛏 *Empty Beds: {total_empty}*  |  Occupied: {total_occupied} / {total_beds}{bld}",
+        f"🛏 *Empty Beds: {total_empty}*  |  Occupied: {total_occupied}"
+        + (f"  |  No-show: {bb.noshow}" if bb.noshow else "")
+        + f"  /  {total_beds}{bld}",
         f"   THOR: {thor['beds']} beds  |  HULK: {hulk['beds']} beds",
-        "",
     ]
+    if bb.over:
+        lines.append(f"⚠ Over capacity: {bb.over} booking(s) in {', '.join(bb.over_rooms)} — fix room assignments")
+    lines.append("")
 
     for block_name in ["THOR", "HULK"]:
         if block_name not in blocks:
@@ -6934,80 +6922,45 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
 # ── Occupancy overview ────────────────────────────────────────────────────────
 
 async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    revenue_filter = and_(Room.active == True, Room.is_staff_room == False)
+    # Canonical bed state — same numbers as vacant rooms, PWA KPI and Sheet.
+    from src.services.occupancy import get_bed_breakdown
+    bb = await get_bed_breakdown(session)
+    total_beds = bb.total_beds
+    checked_in, noshow, vacant = bb.checked_in, bb.noshow, bb.vacant
+    booked = checked_in + noshow
+    total_rooms = len(bb.rooms)
+    occ_rooms = sum(1 for r in bb.rooms.values() if r.checked_in > 0)
 
-    # Total beds — canonical source (keeps bot numbers identical to PWA/Sheet)
-    from src.services.occupancy import get_total_revenue_beds
-    total_beds = await get_total_revenue_beds(session)
+    def _pct(n, d):
+        return int(n * 100 / d) if d else 0
 
-    # Total revenue rooms
-    total_rooms = await session.scalar(
-        select(func.count(Room.id)).where(revenue_filter)
-    ) or 0
-
-    # Beds occupied: premium = 2 beds (full room), regular = 1 bed
-    physical_beds = await session.scalar(
-        select(func.sum(
-            sa_case((Tenancy.sharing_type == "premium", Room.max_occupancy), else_=1)
-        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
-        .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
-    ) or 0
-    physical_rooms = await session.scalar(
-        select(func.count(func.distinct(Tenancy.room_id)))
-        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
-        .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
-    ) or 0
-
-    # No-shows: premium noshow = 2 beds reserved, regular = 1 bed
-    noshow_beds = await session.scalar(
-        select(func.sum(
-            sa_case((Tenancy.sharing_type == "premium", Room.max_occupancy), else_=1)
-        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Tenancy.status == TenancyStatus.no_show,
-            Tenancy.room_id.isnot(None),
-            Room.is_staff_room == False,
-        )
-    ) or 0
-
-    # Day-wise guests currently occupying beds
-    from datetime import date as _date
-    _today = _date.today()
-    daywise_beds = await session.scalar(
-        select(func.count()).select_from(Tenancy).where(
-            Tenancy.stay_type == StayType.daily,
-            Tenancy.checkin_date <= _today,
-            Tenancy.checkout_date >= _today,
-            Tenancy.status == TenancyStatus.active,
-        )
-    ) or 0
-
-    booked_beds  = physical_beds + noshow_beds + daywise_beds
-    vacant_beds  = total_beds - booked_beds
-    vacant_rooms = total_rooms - physical_rooms
-    phys_pct     = int(physical_beds * 100 / total_beds)  if total_beds  else 0
-    booked_pct   = int(booked_beds   * 100 / total_beds)  if total_beds  else 0
-    room_pct     = int(physical_rooms * 100 / total_rooms) if total_rooms else 0
-
-    daywise_line = f"\nDay-wise     : {daywise_beds} beds  (short stays)\n" if daywise_beds else "\n"
-
-    return (
-        f"*Occupancy — {total_beds} total beds*\n\n"
-        f"Checked-in   : {physical_beds} beds  ({phys_pct}%)\n"
-        f"No-show      : {noshow_beds} beds  (booked, not arrived)"
-        f"{daywise_line}"
-        f"*Booked total: {booked_beds} / {total_beds}  ({booked_pct}%)*\n"
-        f"Vacant       : {vacant_beds} beds\n\n"
-        f"Rooms: {physical_rooms} occupied / {total_rooms} total  ({room_pct}%)\n\n"
-        "Say *vacant rooms* to see which rooms are empty."
-    )
+    daywise_note = f"  (incl. {bb.daystay} day-stay)" if bb.daystay else ""
+    lines = [
+        f"*Occupancy — {total_beds} total beds*\n",
+        f"Checked-in   : {checked_in} beds  ({_pct(checked_in, total_beds)}%){daywise_note}",
+        f"No-show      : {noshow} beds  (booked, not arrived)",
+        f"*Booked total: {booked} / {total_beds}  ({_pct(booked, total_beds)}%)*",
+        f"Vacant       : {vacant} beds",
+    ]
+    if bb.upcoming:
+        lines.append(f"Upcoming     : {bb.upcoming} future booking(s) — beds free until check-in")
+    if bb.over:
+        lines.append(f"⚠ Over capacity: {bb.over} booking(s) in {', '.join(bb.over_rooms)} — fix room assignments")
+    lines += [
+        "",
+        f"Rooms: {occ_rooms} occupied / {total_rooms} total  ({_pct(occ_rooms, total_rooms)}%)",
+        "",
+        "Say *vacant rooms* to see which rooms are empty.",
+    ]
+    return "\n".join(lines)
 
 
 async def _room_layout(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """Floor-by-floor room + bed diagram for Thor and Hulk blocks."""
     from src.database.models import Property
+    from src.services.occupancy import revenue_room_filter
 
-    msg = entities.get("description", "").lower()
+    msg = (entities.get("description") or entities.get("_raw_message") or "").lower()
     # Filter to one block if specified
     only_block = None
     if "thor" in msg and "hulk" not in msg:
@@ -7036,7 +6989,7 @@ async def _room_layout(entities: dict, ctx: CallerContext, session: AsyncSession
         # All active non-staff rooms for this property, sorted by floor then room_number
         rooms_result = await session.execute(
             select(Room)
-            .where(Room.property_id == prop.id, Room.active == True, Room.is_staff_room == False)
+            .where(Room.property_id == prop.id, *revenue_room_filter())
             .order_by(Room.floor.nullsfirst(), Room.room_number)
         )
         rooms = rooms_result.scalars().all()
@@ -7077,6 +7030,31 @@ async def _room_layout(entities: dict, ctx: CallerContext, session: AsyncSession
     return "\n".join(lines)
 
 
+# ── Overdue exits (shared by QUERY_EXPIRING + QUERY_ALL_NOTICES) ────────────────
+
+async def _overdue_exit_lines(session: AsyncSession, today: date) -> list[str]:
+    """Active tenancies whose expected_checkout already passed — they are still
+    holding a bed. Both notice summaries used to filter these out (>= today),
+    so a tenant who never got checked out vanished from every list."""
+    rows = (await session.execute(
+        select(Tenant.name, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(Tenancy.status == TenancyStatus.active,
+               Tenancy.expected_checkout != None,
+               Tenancy.expected_checkout < today)
+        .order_by(Tenancy.expected_checkout)
+    )).all()
+    if not rows:
+        return []
+    lines = [f"\n⚠ *Overdue — exit date passed, still active ({len(rows)}):*"]
+    for name, t, room in rows:
+        notice = f", notice {t.notice_date.strftime('%d %b')}" if t.notice_date else ""
+        lines.append(f"  • {name} (Room {room.room_number}) — exit was {t.expected_checkout.strftime('%d %b %Y')}{notice}")
+    lines.append("Check them out or update the exit date.")
+    return lines
+
+
 # ── Expiring tenancies / upcoming checkouts ───────────────────────────────────
 
 async def _query_expiring(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -7101,9 +7079,10 @@ async def _query_expiring(entities: dict, ctx: CallerContext, session: AsyncSess
         .order_by(Tenancy.expected_checkout)
     )
     rows = result.all()
+    overdue = await _overdue_exit_lines(session, today)
 
     if not rows:
-        return f"No notices or upcoming checkouts in {today.strftime('%B %Y')}."
+        return "\n".join([f"No notices or upcoming checkouts in {today.strftime('%B %Y')}."] + overdue)
 
     notice_count = sum(1 for _, t, _ in rows if t.notice_date and t.notice_date >= today.replace(day=1))
     lines = [f"*{notice_count} notice(s) / {len(rows)} upcoming exit(s) — {today.strftime('%B %Y')}*\n"]
@@ -7119,7 +7098,7 @@ async def _query_expiring(entities: dict, ctx: CallerContext, session: AsyncSess
         else:
             deposit_note = f"Deposit Rs.{deposit:,} *forfeited* (no notice)"
         lines.append(f"• {name} (Room {room.room_number})\n  Notice: {notice_str} | Exit: {exit_str} | {deposit_note}")
-    return "\n".join(lines)
+    return "\n".join(lines + overdue)
 
 
 # ── All notices across future months ──────────────────────────────────────────
@@ -7154,9 +7133,10 @@ async def _query_all_notices(_entities: dict, _ctx: CallerContext, session: Asyn
         )
     )
     rows = result.all()
+    overdue = await _overdue_exit_lines(session, today)
 
     if not rows:
-        return "No tenants on notice or upcoming checkouts."
+        return "\n".join(["No tenants on notice or upcoming checkouts."] + overdue)
 
     # Group by checkout month
     by_month = defaultdict(list)
@@ -7171,7 +7151,7 @@ async def _query_all_notices(_entities: dict, _ctx: CallerContext, session: Asyn
     sorted_months = sorted(by_month.keys())
 
     if not sorted_months:
-        return "No tenants on notice or upcoming checkouts."
+        return "\n".join(["No tenants on notice or upcoming checkouts."] + overdue)
 
     notice_count = sum(len(v) for v in by_month.values())
     lines = [f"*On notice: {notice_count} tenant{'s' if notice_count != 1 else ''}*\n"]
@@ -7185,23 +7165,49 @@ async def _query_all_notices(_entities: dict, _ctx: CallerContext, session: Asyn
         for name, room_num, notice_str in sorted(by_month[month_date], key=lambda x: x[0]):
             lines.append(f"  • {name} (Room {room_num}) — Notice: {notice_str}")
 
-    return "\n".join(lines)
+    return "\n".join(lines + overdue)
 
 
 # ── Checkins this month ────────────────────────────────────────────────────────
 
+def _month_window(entities: dict, today: date) -> tuple[date, date]:
+    """(start, end) for "checkins july" / "checkouts march" — the month named in
+    the message (entities["month"]), most recent occurrence; default this month.
+    End is capped at today."""
+    import calendar as _cal
+    m = entities.get("month")
+    if not m:
+        # Entity extraction only knows 3-letter abbreviations ("jul"), so
+        # "checkins july" arrived with no month — read the raw text.
+        raw = (entities.get("_raw_message") or "").lower()
+        mm = re.search(r"\b(?:january|february|march|april|may|june|july|august|september|"
+                       r"october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\b", raw)
+        if mm:
+            m = list(_cal.month_abbr).index(mm.group(0)[:3].title())
+    try:
+        m = int(m) if m else today.month
+    except (TypeError, ValueError):
+        m = today.month
+    y = today.year if m <= today.month else today.year - 1
+    end = date(y, m, _cal.monthrange(y, m)[1])
+    return date(y, m, 1), min(end, today)
+
+
 async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     from src.database.models import DaywiseStay
     today = date.today()
-    month_start = today.replace(day=1)
+    month_start, month_end = _month_window(entities, today)
+    month_label = month_start.strftime('%B %Y')
 
     result = await session.execute(
         select(Tenant.name, Tenancy.checkin_date, Room.room_number, Tenancy.stay_type)
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
+            # no_show / cancelled never arrived — not a check-in
+            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.exited]),
             Tenancy.checkin_date >= month_start,
-            Tenancy.checkin_date <= today,
+            Tenancy.checkin_date <= month_end,
         )
         .order_by(Tenancy.checkin_date.desc())
     )
@@ -7212,14 +7218,14 @@ async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSess
         select(DaywiseStay.guest_name, DaywiseStay.checkin_date, DaywiseStay.room_number)
         .where(
             DaywiseStay.checkin_date >= month_start,
-            DaywiseStay.checkin_date <= today,
+            DaywiseStay.checkin_date <= month_end,
         )
         .order_by(DaywiseStay.checkin_date.desc())
     )
     dw_rows = dw_result.all()
 
     if not rows and not dw_rows:
-        return f"No new check-ins this month ({today.strftime('%B %Y')})."
+        return f"No check-ins in {month_label}."
 
     entries: list[tuple[date, str]] = []
     for name, checkin, room_num, stay_type in rows:
@@ -7230,7 +7236,7 @@ async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSess
     entries.sort(key=lambda x: x[0], reverse=True)
 
     total = len(entries)
-    lines = [f"*Check-ins — {today.strftime('%B %Y')}* ({total} total)\n"]
+    lines = [f"*Check-ins — {month_label}* ({total} total)\n"]
     lines.extend(line for _, line in entries)
     return "\n".join(lines)
 
@@ -7240,7 +7246,8 @@ async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSess
 async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     from src.database.models import DaywiseStay
     today = date.today()
-    month_start = today.replace(day=1)
+    month_start, month_end = _month_window(entities, today)
+    month_label = month_start.strftime('%B %Y')
 
     result = await session.execute(
         select(Tenant.name, Tenancy.checkout_date, Room.room_number, Tenancy.stay_type)
@@ -7249,7 +7256,7 @@ async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSes
         .where(
             Tenancy.status == TenancyStatus.exited,
             Tenancy.checkout_date >= month_start,
-            Tenancy.checkout_date <= today,
+            Tenancy.checkout_date <= month_end,
         )
         .order_by(Tenancy.checkout_date.desc())
     )
@@ -7260,14 +7267,14 @@ async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSes
         select(DaywiseStay.guest_name, DaywiseStay.checkout_date, DaywiseStay.room_number)
         .where(
             DaywiseStay.checkout_date >= month_start,
-            DaywiseStay.checkout_date <= today,
+            DaywiseStay.checkout_date <= month_end,
         )
         .order_by(DaywiseStay.checkout_date.desc())
     )
     dw_rows = dw_result.all()
 
     if not rows and not dw_rows:
-        return f"No check-outs this month ({today.strftime('%B %Y')})."
+        return f"No check-outs in {month_label}."
 
     entries: list[tuple[date, str]] = []
     for name, checkout, room_num, stay_type in rows:
@@ -7280,7 +7287,7 @@ async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSes
     entries.sort(key=lambda x: x[0], reverse=True)
 
     total = len(entries)
-    lines = [f"*Check-outs — {today.strftime('%B %Y')}* ({total} total)\n"]
+    lines = [f"*Check-outs — {month_label}* ({total} total)\n"]
     lines.extend(line for _, line in entries)
     return "\n".join(lines)
 
@@ -7300,9 +7307,18 @@ async def _log_vacation(entities: dict, ctx: CallerContext, session: AsyncSessio
             "Say: *[Name] on vacation from [date] to [date]*"
         )
 
+    # Employee vacation (Lokesh / Dilip) → the same operational log the PWA Operations
+    # page writes (VACATION_EMPLOYEES is the single list).
+    from src.api.v2.operations import VACATION_EMPLOYEES
+    emp = next((e for e in VACATION_EMPLOYEES if name and name.split()[0].lower() == e.lower()), None)
+    if emp:
+        return await _log_employee_vacation(emp, entities, ctx, session)
+
     rows: list = []
     if name:
         rows = await _find_active_tenants_by_name(name, session)
+        if len(rows) > 1 and room:
+            rows = [r for r in rows if str(r[2].room_number).upper() == room.upper()] or rows
     if not rows and room:
         rows = await _find_active_tenants_by_room(room, session)
 
@@ -7310,14 +7326,107 @@ async def _log_vacation(entities: dict, ctx: CallerContext, session: AsyncSessio
         suggestions = await _find_similar_names(name, session) if name else []
         return _format_no_match_message(name or room, suggestions)
 
+    if len(rows) > 1 and not room:
+        names = "\n".join(f"• {t.name} — room {r.room_number}" for t, _tn, r in rows[:8])
+        return (
+            f"More than one tenant matches *{name}*:\n{names}\n\n"
+            "Send it again with the full name, e.g. *"
+            f"{rows[0][0].name} vacation from 15 Oct to 20 Oct*"
+        )
     tenant, tenancy, room_obj = rows[0]
+    from_dt, to_dt = _vacation_dates(entities)
+    if not from_dt or not to_dt:
+        return (
+            f"*Vacation for {tenant.name}* (Room {room_obj.room_number}) — dates needed.\n"
+            f"Send it in one message, e.g. *{tenant.name.split()[0]} vacation from 15 Oct to 20 Oct*"
+        )
+    if to_dt < from_dt:
+        return "The return date is before the leaving date. Please check and resend."
+
+    existing = await session.scalar(select(Vacation).where(
+        Vacation.tenancy_id == tenancy.id, Vacation.from_date == from_dt, Vacation.to_date == to_dt,
+    ))
+    if existing:
+        return (f"Vacation for *{tenant.name}* ({from_dt.strftime('%d %b')} – "
+                f"{to_dt.strftime('%d %b %Y')}) is already logged.")
+    vac = Vacation(tenancy_id=tenancy.id, from_date=from_dt, to_date=to_dt,
+                   affects_billing=False, notes=f"Logged via WhatsApp by {ctx.name or ctx.phone}")
+    session.add(vac)
+    await session.flush()
+    _ops_audit(session, ctx, "vacation", vac.id, tenant.name, "vacation",
+               None, f"{from_dt.isoformat()} to {to_dt.isoformat()}", room_obj.room_number)
+    days = (to_dt - from_dt).days
     return (
-        f"*Log vacation for {tenant.name}* (Room {room_obj.room_number})\n\n"
-        "Please send dates:\n"
-        "From: DD Mon\n"
-        "To: DD Mon\n\n"
-        "Example: *Raj vacation from 15 Apr to 30 Apr*"
+        f"*Vacation logged — {tenant.name}* (Room {room_obj.room_number})\n"
+        f"Away: {from_dt.strftime('%d %b %Y')} → back {to_dt.strftime('%d %b %Y')} "
+        f"({days} day{'s' if days != 1 else ''})\n"
+        "_Rent is not changed by a vacation._"
     )
+
+
+async def _log_employee_vacation(emp: str, entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    from src.database.models import OperationalLog
+    from_dt, to_dt = _vacation_dates(entities)
+    if not from_dt or not to_dt:
+        return (f"*Vacation for {emp}* — dates needed.\n"
+                f"Send it in one message, e.g. *{emp} on leave from 15 Oct to 18 Oct*")
+    if to_dt < from_dt:
+        return "The end date is before the start date. Please check and resend."
+    details = {"employee": emp, "start_date": from_dt.isoformat(), "end_date": to_dt.isoformat()}
+    dup = await session.scalar(select(OperationalLog).where(
+        OperationalLog.category == "vacation",
+        OperationalLog.details["employee"].astext == emp,
+        OperationalLog.details["start_date"].astext == details["start_date"],
+        OperationalLog.details["end_date"].astext == details["end_date"],
+    ))
+    if dup:
+        return f"{emp}'s leave {from_dt.strftime('%d %b')} – {to_dt.strftime('%d %b %Y')} is already logged."
+    row = OperationalLog(category="vacation", details=details,
+                         notes="Logged via WhatsApp", logged_by=ctx.name or ctx.phone)
+    session.add(row)
+    await session.flush()
+    _ops_audit(session, ctx, "operational_log", row.id, emp, "vacation",
+               None, f"{details['start_date']} to {details['end_date']}")
+    return (f"*Leave logged — {emp}*\n"
+            f"{from_dt.strftime('%d %b %Y')} → {to_dt.strftime('%d %b %Y')}\n"
+            "_Shows in the Kozzy app under Operations._")
+
+
+def _vacation_dates(entities: dict) -> tuple[Optional[date], Optional[date]]:
+    """(from, to) from 'from 15 Oct to 20 Oct' / '15 oct - 20 oct' / 'from 15 oct for 3 days'.
+    Reuses the tenant-side vacation regexes + the shared date parser (one parser)."""
+    from src.whatsapp.handlers.tenant_handler import _RE_FROM, _RE_BACK
+    from src.whatsapp.intent_detector import _extract_date_entity
+    raw = entities.get("_raw_message") or entities.get("description") or ""
+    _d = r"\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*"
+    found = re.findall(_d, raw, re.I)
+    f_m, b_m = _RE_FROM.search(raw), _RE_BACK.search(raw)
+    f_txt = f_m.group(1) if f_m else (found[0] if found else None)
+    b_txt = b_m.group(1) if b_m else (found[1] if len(found) > 1 else None)
+    f_iso = _extract_date_entity(f_txt) if f_txt else None
+    b_iso = _extract_date_entity(b_txt) if b_txt else None
+    from_dt = date.fromisoformat(f_iso) if f_iso else None
+    to_dt = date.fromisoformat(b_iso) if b_iso else None
+    if from_dt and not to_dt:
+        n = re.search(r"\b(?:for\s+)?(\d{1,2})\s*(?:days?|din)\b", raw, re.I)
+        if n:
+            to_dt = from_dt + timedelta(days=int(n.group(1)))
+    if from_dt and to_dt and to_dt < from_dt and not re.search(r"\b20\d\d\b", raw):
+        to_dt = to_dt.replace(year=to_dt.year + 1)   # "28 Dec to 3 Jan"
+    return from_dt, to_dt
+
+
+def _ops_audit(session: AsyncSession, ctx: CallerContext, entity_type: str, entity_id: int,
+               entity_name: str, field: str, old, new, room_number: Optional[str] = None) -> None:
+    """audit_log row for an ops write made over WhatsApp (complaints, contacts, wifi, vacation)."""
+    from src.database.models import AuditLog
+    session.add(AuditLog(
+        changed_by=ctx.phone or "system", entity_type=entity_type, entity_id=entity_id or 0,
+        entity_name=(entity_name or "")[:120], field=field,
+        old_value=None if old is None else str(old)[:500],
+        new_value=None if new is None else str(new)[:500],
+        room_number=room_number, source="whatsapp",
+    ))
 
 
 # ── Room status ───────────────────────────────────────────────────────────────
@@ -7330,10 +7439,30 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
     from src.services.occupants import find_occupants
     from src.services.room_occupancy import get_room_future_reservations
 
-    occ = await find_occupants(session, room=room)
+    # Resolve ONE room exactly (case-insensitive). Substring matching made
+    # "room 10" list every occupant of 105/110/G10/310… as one room.
+    # Fallback: a combined number like "508/509" when the token is one half.
     room_obj = await session.scalar(
-        select(Room).where(Room.room_number.ilike(f"%{room}%"))
+        select(Room).where(func.lower(Room.room_number) == room.lower())
     )
+    if not room_obj:
+        combo = (await session.execute(
+            select(Room).where(Room.room_number.ilike(f"%{room}%"), Room.room_number.like("%/%"))
+        )).scalars().all()
+        combo = [r for r in combo if room.lower() in r.room_number.lower().split("/")]
+        if len(combo) == 1:
+            room_obj = combo[0]
+    if not room_obj:
+        return f"Room {room} not found."
+    if room_obj.is_staff_room:
+        from src.database.models import Staff
+        staff = (await session.execute(
+            select(Staff.name).where(Staff.room_id == room_obj.id, Staff.active == True)
+        )).scalars().all()
+        who = ", ".join(staff) if staff else "no staff assigned"
+        return (f"*Room {room_obj.room_number}* — staff room (not rented to tenants)\n"
+                f"Staff: {who}")
+    occ = await find_occupants(session, room_id=room_obj.id)
 
     # Upcoming no-show reservations — the bed is physically free until
     # their checkin_date. Show these so the receptionist knows until when
@@ -7451,6 +7580,8 @@ async def _daystay_availability(
     ]
     if r["occupied_noshow"]:
         lines.append(f"  Held by arrivals (on/before target): {r['occupied_noshow']}")
+    if r.get("over"):
+        lines.append(f"  ⚠ Over capacity: {r['over']} booking(s) in {', '.join(r['over_rooms'])}")
     lines.append("")
     if r["free"] <= 0:
         lines.append("No beds free — property full.")
@@ -7516,28 +7647,13 @@ async def _query_checkout_room(entities: dict, ctx: CallerContext, session: Asyn
 # ── Send reminder to all pending tenants ──────────────────────────────────────
 
 async def _send_reminder_all(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    current_month = date.today().replace(day=1)
-    result = await session.execute(
-        select(Tenant.name, Tenant.phone, RentSchedule.rent_due)
-        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
-        .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
-        .where(
-            Tenancy.status == TenancyStatus.active,
-            RentSchedule.period_month == current_month,
-            RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-        )
-        .order_by(Tenant.name)
+    # Rule (rules_no_tenant_comms): zero automated messages to tenants. This used to
+    # reply "reminders queued" while sending nothing — now it says what is true.
+    # Nothing is queued or sent.
+    return (
+        "Rent reminders are switched off — the bot does not message tenants.\n"
+        "Nothing was sent. See who is unpaid in the *Kozzy app* and message them yourself if needed."
     )
-    rows = result.all()
-    if not rows:
-        return f"All tenants are paid up for {current_month.strftime('%B %Y')}! No reminders needed."
-
-    # In production this would queue WhatsApp messages; here we list who would be notified
-    lines = [f"*Reminder list — {current_month.strftime('%B %Y')}*\n", f"{len(rows)} tenants to be reminded:\n"]
-    for name, phone, rent_due in rows:
-        lines.append(f"• {name} ({phone}) — Rs.{int(rent_due or 0):,} due")
-    lines.append("\n_WhatsApp reminders queued. Tenants will be notified shortly._")
-    return "\n".join(lines)
 
 
 async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -7584,6 +7700,13 @@ async def _update_tenant_notes(entities: dict, ctx: CallerContext, session: Asyn
     """Show current tenant agreement notes and prompt for update."""
     name = entities.get("name", "").strip()
     room = entities.get("room", "").strip()
+
+    if not name and not room:
+        # "update vidya dutta notes" / "edit Raj's agreement"
+        _raw = entities.get("_raw_message", "") or ""
+        _nm = re.search(r"^\s*(?:update|edit|change|modify)\s+(?!tenant\b)([a-z][a-z.]*(?:\s+[a-z][a-z.]*){0,2}?)'?s?\s+(?:notes?|agreement)\s*$", _raw, re.I)
+        if _nm:
+            name = _nm.group(1).strip()
 
     if not name and not room:
         return "Which tenant? Reply with: *update notes [Name]* or *update notes room [Number]*"
@@ -7858,6 +7981,8 @@ async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSess
         "vendor", "vendors", "supplier", "suppliers", "guy", "person",
         "all", "every", "each", "send", "want", "need", "tell", "share",
         "please", "can", "you", "i", "to", "my", "have", "whats", "what",
+        "query",  # menu button id "QUERY_CONTACTS" arrives as the message text
+        "kaun", "kon", "hai", "ka", "no",
     }
     words = re.findall(r"[a-z]+", raw)
     # Strip trailing 's' for fuzzy matching (vinays → vinay, plumbers → plumber)
@@ -7948,111 +8073,117 @@ async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSess
     return "\n".join(lines)
 
 
-# ── ASSIGN ROOM (unassigned/future booking → active with room) ────────────────
+# ── ASSIGN ROOM (booked / unassigned tenant → a real room) ────────────────────
 
-async def _assign_room_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Assign a room to a tenant who has an unassigned/future booking."""
-    name = entities.get("name", "").strip()
-    room_str = entities.get("room", "").strip()
+async def _assign_room_next(phone: str, tenancy_id: int, room_str: str, session: AsyncSession) -> str:
+    """Shared tail of ASSIGN_ROOM: refuse a checked-in tenant, ask for the room
+    if missing, run the shared capacity gate, then save the confirm pending.
+
+    ASSIGN_ROOM only moves an existing booking (no_show tenancy, usually in
+    placeholder room 000) — it never creates a tenancy. The move itself goes
+    through execute_room_transfer() like every other room change.
+    """
+    from services.room_transfer import check_transfer_destination
+    row = (await session.execute(
+        select(Tenant, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id, isouter=True)
+        .where(Tenancy.id == tenancy_id)
+    )).first()
+    if not row:
+        return "Booking not found."
+    tenant, tenancy, cur_room = row
+    cur_label = cur_room.room_number if cur_room and cur_room.room_number != "000" else "unassigned"
+
+    if tenancy.status == TenancyStatus.active and cur_label != "unassigned":
+        return (
+            f"*{tenant.name}* is already checked in to Room *{cur_label}*.\n"
+            f"To change rooms say: *move {tenant.name} to {room_str or '[room]'}*"
+        )
 
     if not room_str:
-        desc = entities.get("description", "") or entities.get("_raw_message", "")
-        rm = re.search(r"(?:room\s*)?(\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)", desc, re.I)
-        if rm:
-            room_str = rm.group(1)
+        await _save_pending(phone, "ASSIGN_ROOM_STEP",
+                            {"step": "ask_room", "tenancy_id": tenancy.id,
+                             "tenant_name": tenant.name}, [], session)
+        return (
+            f"Assigning a room to *{tenant.name}* (booking, currently {cur_label}).\n"
+            "Which room? (e.g. 305)"
+        )
+
+    new_room, err = await check_transfer_destination(session, tenancy, room_str)
+    if err:
+        if new_room is None:
+            return f"Room *{room_str}* not found. Check the room number."
+        return f"{err}\nPick a different room."
+
+    checkin = tenancy.checkin_date.strftime("%d %b %Y") if tenancy.checkin_date else "not set"
+    await _save_pending(phone, "ASSIGN_ROOM_STEP",
+                        {"step": "confirm", "tenancy_id": tenancy.id, "tenant_name": tenant.name,
+                         "room_number": new_room.room_number, "checkin": checkin}, [], session)
+    return (
+        f"*Assign Room?*\n\n"
+        f"Tenant: {tenant.name} ({tenant.phone})\n"
+        f"Booking check-in: {checkin}\n"
+        f"Room: {cur_label} → *{new_room.room_number}*\n\n"
+        "Reply *yes* to confirm or *no* to cancel."
+    )
+
+
+async def _assign_room_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Assign / change the room of a tenant who has a booking (no_show tenancy)."""
+    name = (entities.get("name") or "").strip()
+    raw = entities.get("_raw_message", "") or entities.get("description", "") or ""
+    rm = re.search(r"\broom\s+([A-Za-z]?\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)\b", raw, re.I) \
+        or re.search(r"\b([A-Za-z]?\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)\b", raw)
+    room_str = rm.group(1) if rm else (entities.get("room") or "").strip()
+    if not name:
+        nm = re.search(r"\b(?:to|for)\s+(?!room\b)([A-Za-z][A-Za-z.]*(?:\s+[A-Za-z][A-Za-z.]*){0,3})\s*$", raw, re.I) \
+            or re.search(r"\bassign\s+(?!room\b)([A-Za-z][A-Za-z.]*(?:\s+[A-Za-z][A-Za-z.]*){0,3}?)\s+(?:to\s+)?room\b", raw, re.I)
+        name = nm.group(1).strip() if nm else ""
 
     if not name:
         return (
             "Who should be assigned a room?\n"
-            "Say: *assign room 305-A to Raj* or *assign Raj to room 305-A*"
+            "Say: *assign room 305 to Raj* or *assign Raj to room 305*"
         )
 
-    # Find tenant — prefer unassigned/future bookings
-    from src.database.models import TenancyStatus
-    unassigned = (await session.execute(
-        select(Tenant, Tenancy, Room)
-        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
-        .join(Room, Room.id == Tenancy.room_id, isouter=True)
-        .where(
-            Tenant.name.ilike(f"%{name}%"),
-            Tenancy.status.in_([TenancyStatus.active]),
-        )
-        .order_by(Tenancy.checkin_date.desc())
-    )).all()
-
-    # Also check for tenants without any active tenancy (future booking with no room)
-    no_tenancy = (await session.execute(
-        select(Tenant).where(
-            Tenant.name.ilike(f"%{name}%"),
-            ~Tenant.id.in_(
-                select(Tenancy.tenant_id).where(Tenancy.status == TenancyStatus.active)
+    def _q(pattern: str):
+        return (
+            select(Tenant, Tenancy, Room)
+            .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Room.id == Tenancy.room_id, isouter=True)
+            .where(
+                Tenant.name.ilike(pattern),
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
             )
+            .order_by(Tenant.name, Tenancy.checkin_date.desc())
         )
-    )).scalars().all()
 
-    # Check if any active tenancy already has a room assigned
-    for tenant, tenancy, room in unassigned:
-        if room and room.active:
-            return (
-                f"*{tenant.name}* ({tenant.phone}) already has active room *{room.room_number}*.\n"
-                f"Did you mean *move {tenant.name} to {room_str or 'new room'}*?"
-            )
+    rows = (await session.execute(_q(f"%{name}%"))).all()
+    if not rows and " " in name:
+        from src.whatsapp.handlers._shared import surname_resembles
+        rows = [r for r in (await session.execute(_q(f"{name.split()[0]}%"))).all()
+                if surname_resembles(name, r[0].name)]
 
-    # Match future bookings / unassigned
-    if no_tenancy:
-        if len(no_tenancy) == 1:
-            tenant = no_tenancy[0]
-        else:
-            choices = [{"label": f"{t.name} ({t.phone})", "tenant_id": t.id} for t in no_tenancy]
-            choice_lines = "\n".join(f"*{i+1}.* {c['label']}" for i, c in enumerate(choices))
-            await _save_pending(ctx.phone, "ASSIGN_ROOM_STEP",
-                                {"step": "pick_tenant", "room": room_str, "choices": choices}, [], session)
-            return f"Multiple matches for *{name}*:\n{choice_lines}\n\nReply with number."
-
-        if not room_str:
-            await _save_pending(ctx.phone, "ASSIGN_ROOM_STEP",
-                                {"step": "ask_room", "tenant_id": tenant.id, "tenant_name": tenant.name,
-                                 "tenant_phone": tenant.phone}, [], session)
-            return (
-                f"Assigning room to *{tenant.name}* ({tenant.phone}).\n"
-                "Which room? (e.g. 305-A)"
-            )
-
-        # Validate room
-        new_room = await session.scalar(
-            select(Room).where(Room.room_number == room_str.upper(), Room.active == True)
+    if not rows:
+        return (
+            f"No booking found for *{name}*.\n"
+            "Assign room works on an existing booking — use *add tenant* for a new check-in."
         )
-        if not new_room:
-            return f"Room *{room_str}* not found. Check room number."
 
-        # Check vacancy
-        occupied = await session.scalar(
-            select(func.count(Tenancy.id)).where(
-                Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active,
-            )
-        )
-        if occupied:
-            return f"Room *{room_str}* is occupied. Pick a vacant room."
-
-        # Confirm
+    if len(rows) > 1:
+        choices = []
+        for t, tc, r in rows:
+            where = r.room_number if r and r.room_number != "000" else "unassigned"
+            kind = "booked" if tc.status == TenancyStatus.no_show else "checked in"
+            choices.append({"label": f"{t.name} (Room {where}, {kind})", "tenancy_id": tc.id})
+        choice_lines = "\n".join(f"*{i+1}.* {c['label']}" for i, c in enumerate(choices))
         await _save_pending(ctx.phone, "ASSIGN_ROOM_STEP",
-                            {"step": "confirm", "tenant_id": tenant.id, "tenant_name": tenant.name,
-                             "tenant_phone": tenant.phone, "room_id": new_room.id,
-                             "room_number": new_room.room_number}, [], session)
-        return (
-            f"*Assign Room?*\n\n"
-            f"Tenant: {tenant.name} ({tenant.phone})\n"
-            f"Room: {new_room.room_number}\n\n"
-            "Reply *yes* to confirm or *no* to cancel."
-        )
+                            {"step": "pick_tenant", "room": room_str, "choices": choices}, [], session)
+        return f"Found {len(choices)} matches for *{name}* — which one?\n{choice_lines}\n\nReply with number."
 
-    if not unassigned and not no_tenancy:
-        return (
-            f"No unassigned tenant found matching *{name}*.\n"
-            "Use *add tenant* for new check-ins."
-        )
-
-    return f"Could not find an unassigned booking for *{name}*."
+    _t, tenancy, _r = rows[0]
+    return await _assign_room_next(ctx.phone, tenancy.id, room_str, session)
 
 
 async def _query_unhandled(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -8095,29 +8226,45 @@ async def _blacklist_add(entities: dict, ctx: CallerContext, session: AsyncSessi
 
     # Strip leading command words to isolate the name
     name = _re.sub(
-        r"^(?:blacklist|block|ban|never\s+give\s+(?:bed|room)\s+to|"
-        r"do\s+not\s+(?:admit|onboard)|add\s+to\s+blacklist)\s+",
+        r"^(?:blacklist|block|ban|never\s+give\s+(?:a\s+)?(?:bed|room)\s+to|"
+        r"(?:do\s+not|don'?t|never)\s+(?:admit|onboard)|add\s+to\s+(?:the\s+)?blacklist|add)\s+",
         "", before_reason, flags=_re.I,
-    ).strip()
+    )
+    name = _re.sub(r"\s+(?:to|in|into)\s+(?:the\s+)?blacklist\s*$", "", name, flags=_re.I).strip(" ,.-")
 
-    if not name:
+    # A bare mobile number is a phone entry, not a name.
+    phone = None
+    _digits = _re.sub(r"\D", "", name)
+    if name and _re.fullmatch(r"\+?[\d\s-]{10,15}", name) and len(_digits) >= 10:
+        phone, name = _digits[-10:], ""
+
+    if not name and not phone:
         return (
             "Usage: *blacklist [name] reason [reason]*\n"
             "Example: blacklist Prem Prasana reason fought with other tenants"
         )
 
-    if not reason:
-        await _save_pending(
-            ctx.phone, "BLACKLIST_ADD_REASON", {"name": name}, [], session
-        )
+    from src.services.blacklist import add_to_blacklist, check_blacklisted
+    existing = await check_blacklisted(session, name=name or None, phone=phone)
+    if existing and ((phone and existing.get("phone")) or
+                     (name and (existing.get("name") or "").lower() == name.lower())):
         return (
-            f"Adding *{name}* to blacklist.\n"
-            "What's the reason? (Reply with a short note)"
+            f"*{existing.get('name') or existing.get('phone')}* is already on the blacklist "
+            f"(ID {existing['id']}). Reason: {existing.get('reason')}"
         )
 
-    from src.services.blacklist import add_to_blacklist
-    await add_to_blacklist(session, name=name, reason=reason, added_by=ctx.phone)
-    return f"*{name}* has been added to the blacklist.\nReason: {reason}"
+    who = name or phone
+    if not reason:
+        await _save_pending(
+            ctx.phone, "BLACKLIST_ADD_REASON", {"name": name, "phone": phone}, [], session
+        )
+        return (
+            f"Adding *{who}* to blacklist.\n"
+            "What's the reason? (Reply with a short note, or *cancel*)"
+        )
+
+    await add_to_blacklist(session, name=name or None, phone=phone, reason=reason, added_by=ctx.phone)
+    return f"*{who}* has been added to the blacklist.\nReason: {reason}"
 
 
 async def _show_blacklist(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -8141,16 +8288,27 @@ async def _blacklist_remove(entities: dict, ctx: CallerContext, session: AsyncSe
     from sqlalchemy import text as _text
     raw = (entities.get("_raw_message") or entities.get("description") or "").strip()
 
-    # Numeric ID → look up, confirm, then remove
+    # Mobile number (10+ digits) → match the phone column; short number → ID
     id_m = _re.search(r"\b(\d+)\b", raw)
-    if id_m:
+    _all_digits = _re.sub(r"\D", "", raw)
+    if id_m and len(_all_digits) >= 10:
+        _ph = _all_digits[-10:]
+        row = (await session.execute(
+            _text("SELECT id, COALESCE(name, phone) AS name, reason FROM blacklist "
+                  "WHERE is_active=TRUE AND regexp_replace(phone, '[^0-9]', '', 'g') LIKE :p LIMIT 1"),
+            {"p": f"%{_ph}"},
+        )).first()
+        if not row:
+            return f"No active blacklist entry for phone {_ph}."
+    elif id_m:
         bl_id = int(id_m.group(1))
         row = (await session.execute(
-            _text("SELECT id, name, reason FROM blacklist WHERE id=:id AND is_active=TRUE"),
+            _text("SELECT id, COALESCE(name, phone) AS name, reason FROM blacklist WHERE id=:id AND is_active=TRUE"),
             {"id": bl_id},
         )).first()
         if not row:
             return f"No active blacklist entry with ID {bl_id}."
+    if id_m:
         await _save_pending(
             ctx.phone, "BLACKLIST_REMOVE_CONFIRM",
             {"id": row.id, "name": row.name}, [], session,
@@ -8163,9 +8321,10 @@ async def _blacklist_remove(entities: dict, ctx: CallerContext, session: AsyncSe
 
     # Name-based: strip command words
     name = _re.sub(
-        r"^(?:remove|unblock|unban|delist|clear|unblacklist)\s+(?:from\s+blacklist\s+)?",
+        r"^(?:remove|unblock|unban|delist|clear|unblacklist)\s+(?:from\s+(?:the\s+)?blacklist\s+)?",
         "", raw, flags=_re.I,
-    ).strip()
+    )
+    name = _re.sub(r"\s+from\s+(?:the\s+)?blacklist\s*$", "", name, flags=_re.I).strip()
     if not name or len(name) < 3:
         return "Usage: *unblacklist [id]* or *unblacklist [name]*"
 
@@ -8218,95 +8377,237 @@ async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) ->
             ))
     except Exception:
         pass  # don't break the reply over logging
+    # Never suggest finance commands here — they are blocked on WhatsApp (Kozzy app only).
     return (
         "I didn't understand that.\n\n"
         "Try:\n"
-        "• *[Name] paid [amount]*\n"
-        "• *Who hasn't paid?*\n"
-        "• *Monthly report*\n"
-        "• *help* for full menu"
+        "• *room 422*\n"
+        "• *show complaints*\n"
+        "• *help* for the full menu\n\n"
+        "_Payments, dues and reports are in the Kozzy app._"
     )
 
 
 # ── Onboarding ─────────────────────────────────────────────────────────────────
 
+_ONBOARD_DATE_RX = re.compile(
+    r"\b(\d{1,2}[/\-.]\d{1,2}(?:[/\-.]\d{2,4})?"
+    r"|\d{1,2}(?:st|nd|rd|th)?\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?"
+    r"|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*\d{4})?"
+    r"|today|tomorrow)\b",
+    re.I,
+)
+_ONBOARD_ROOM_RX = re.compile(r"\b(?:room|rm|r)\s*(?:no\.?|number|#)?\s*[:\-]?\s*([gG]?\d{1,3}[a-zA-Z]?)\b", re.I)
+_ONBOARD_RENT_RX = re.compile(r"\b(?:rent|monthly)\s*[:\-]?\s*(?:rs\.?|₹)?\s*(\d[\d,]*(?:\.\d+)?\s*k?)\b", re.I)
+_ONBOARD_DEP_RX = re.compile(r"\b(?:deposit|dep|security)\s*[:\-]?\s*(?:rs\.?|₹)?\s*(\d[\d,]*(?:\.\d+)?\s*k?)\b", re.I)
+_ONBOARD_CHECKIN_RX = re.compile(r"\b(?:check.?in|joining|from|arriv\w*|date)\s*[:\-]?\s*(?:on\s+)?", re.I)
+
+
+def _onboard_amount(raw: str) -> int:
+    raw = (raw or "").lower().replace(",", "").replace(" ", "")
+    mult = 1000 if raw.endswith("k") else 1
+    try:
+        return int(float(raw.rstrip("k")) * mult)
+    except ValueError:
+        return 0
+
+
+def _onboard_date(raw: str) -> str:
+    from src.whatsapp.intent_detector import _extract_date_entity
+    low = raw.strip().lower()
+    if low == "today":
+        return date.today().isoformat()
+    if low == "tomorrow":
+        return (date.today() + timedelta(days=1)).isoformat()
+    return _extract_date_entity(raw) or ""
+
+
+def _parse_onboarding_terms(text: str, data: dict) -> dict:
+    """Merge room / rent / deposit / check-in date found in `text` into `data`.
+    Accepts labelled ("room 305 rent 14000 deposit 14000 checkin 20 Oct") or
+    positional ("305 14000 14000 20 Oct") replies; labelled values win."""
+    t = text or ""
+    found = dict(data)
+    # check-in date: the date after a check-in label, else the first date in the text
+    date_m = None
+    lab = _ONBOARD_CHECKIN_RX.search(t)
+    if lab:
+        date_m = _ONBOARD_DATE_RX.match(t, lab.end()) or _ONBOARD_DATE_RX.search(t, lab.end())
+    if not date_m:
+        date_m = _ONBOARD_DATE_RX.search(t)
+    rest = t
+    if date_m:
+        iso = _onboard_date(date_m.group(1))
+        if iso:
+            found["checkin"] = iso
+        rest = t[:date_m.start()] + " " + t[date_m.end():]
+    m = _ONBOARD_ROOM_RX.search(rest)
+    if m:
+        found["room"] = m.group(1).upper()
+        rest = rest[:m.start()] + " " + rest[m.end():]
+    m = _ONBOARD_RENT_RX.search(rest)
+    if m:
+        found["rent"] = _onboard_amount(m.group(1))
+        rest = rest[:m.start()] + " " + rest[m.end():]
+    m = _ONBOARD_DEP_RX.search(rest)
+    if m:
+        found["deposit"] = _onboard_amount(m.group(1))
+        rest = rest[:m.start()] + " " + rest[m.end():]
+    # positional leftovers: a room-looking token, then amounts (rent, deposit) in order
+    rest = re.sub(r"\b[6-9]\d{9}\b", " ", rest)  # never read the tenant phone as an amount
+    tokens = re.findall(r"\b[gG]\d{1,2}\b|\d[\d,]*(?:\.\d+)?k?\b", rest)
+    for tok in tokens:
+        low = tok.lower()
+        if "room" not in found and (low.startswith("g") or (low.isdigit() and len(low) == 3)):
+            found["room"] = tok.upper()
+            continue
+        amt = _onboard_amount(tok)
+        if amt < 500:
+            continue
+        if "rent" not in found:
+            found["rent"] = amt
+        elif "deposit" not in found:
+            found["deposit"] = amt
+    return found
+
+
+_ONBOARD_ASK = (
+    "Send *room, monthly rent, deposit, check-in date*.\n"
+    "Example: *room 305 rent 14000 deposit 14000 checkin 20 Oct*\n"
+    "(or just *305 14000 14000 20 Oct*)"
+)
+
+
+async def _onboarding_next(data: dict, phone: str, session: AsyncSession) -> str:
+    """Ask for what is still missing, or show the confirm summary."""
+    missing = [lbl for key, lbl in (("room", "room"), ("rent", "monthly rent"),
+                                     ("deposit", "deposit"), ("checkin", "check-in date"))
+               if not data.get(key)]
+    if missing:
+        data["step"] = "collect"
+        await _save_pending(phone, "START_ONBOARDING", data, [], session)
+        head = f"*New booking — {data['name']}* ({data['phone']})\n\n"
+        if len(missing) == 4:
+            return head + _ONBOARD_ASK
+        got = []
+        if data.get("room"):
+            got.append(f"Room {data['room']}")
+        if data.get("rent"):
+            got.append(f"Rent Rs.{int(data['rent']):,}")
+        if data.get("deposit"):
+            got.append(f"Deposit Rs.{int(data['deposit']):,}")
+        if data.get("checkin"):
+            got.append(f"Check-in {date.fromisoformat(data['checkin']).strftime('%d %b %Y')}")
+        return (head + ("Got: " + ", ".join(got) + "\n" if got else "")
+                + "Still need: *" + ", ".join(missing) + "*")
+    data["step"] = "confirm"
+    await _save_pending(phone, "START_ONBOARDING", data, [], session)
+    ci = date.fromisoformat(data["checkin"]).strftime("%d %b %Y")
+    return (
+        f"*Confirm booking?*\n\n"
+        f"Name: {data['name']}\n"
+        f"Phone: {data['phone']}\n"
+        f"Room: {data['room']}\n"
+        f"Rent: Rs.{int(data['rent']):,}/month\n"
+        f"Deposit: Rs.{int(data['deposit']):,}\n"
+        f"Check-in: {ci}\n\n"
+        "Reply *Yes* to create the booking and get the form link, *No* to cancel.\n"
+        "_To change a value, just send it (e.g. *rent 15000*)._"
+    )
+
+
 async def _start_onboarding(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """
-    Owner says: "start onboarding Rahul 9876543210" or "start onboarding for Rahul 9876543210"
-    Flow:
-      1. Extract name + phone from entities
-      2. Create Tenant record (or find existing)
-      3. Create OnboardingSession for that tenant
-      4. Reply: confirm + tell owner to have tenant message the bot
-    """
-    name  = entities.get("name", "").strip()
-    phone = entities.get("phone", "").strip()
+    """Staff: "start onboarding Rahul 9876543210 [room 305 rent 14000 deposit 14000 checkin 20 Oct]".
 
-    # Minimal extraction from description if not parsed into entities
-    if not phone or not name:
-        desc = entities.get("description", "")
-        import re as _re
-        ph_match = _re.search(r"\b([6-9]\d{9})\b", desc)
-        if ph_match:
-            phone = ph_match.group(1)
-        # Name: first word(s) before or after the phone number
-        name_text = _re.sub(r"start\s+onboarding\s+(?:for\s+)?|begin\s+(?:kyc|onboarding|checkin)\s+(?:for\s+)?|onboard\s+|kyc\s+for\s+|checkin\s+for\s+", "", desc, flags=_re.I)
-        name_text = _re.sub(r"\b[6-9]\d{9}\b", "", name_text).strip()
-        if name_text and not name:
-            name = name_text.strip()
-
+    Collects room / rent / deposit / check-in, confirms, then creates the booking
+    through the SAME service as the PWA quick-book (src/api/v2/bookings.create_booking)
+    and hands STAFF the tenant form link (BASE_URL/join/{token}) to forward.
+    Nothing is sent to the tenant automatically, and no Tenant row is created until
+    the tenant submits the form (the old chat-KYC flow left orphan Tenant rows and
+    asked tenants to WhatsApp a number that is silenced for them).
+    """
+    desc = entities.get("_raw_message") or entities.get("description", "") or ""
+    ph = re.search(r"(?<!\d)(?:\+?91[\s-]?)?([6-9]\d{9})(?!\d)", desc)
+    phone = ph.group(1) if ph else ""
+    if not phone and entities.get("phone"):
+        phone = re.sub(r"\D", "", str(entities["phone"]))[-10:]
+    name = (entities.get("name") or "").strip()
+    if not name and ph:
+        before = desc[:ph.start()]
+        before = re.sub(
+            r"(?i)\b(?:start|begin|add|new)?\s*(?:onboarding|onboard|kyc|registration|checkin|check-in|tenant|tenent|tenet|admission)\b|\b(?:for|of)\b",
+            " ", before)
+        name = " ".join(w for w in before.split() if w.isalpha()).strip().title()
     if not phone:
         return (
-            "Please provide the tenant's *name and phone number*.\n\n"
+            "Please give the tenant's *name and phone number*.\n\n"
             "Example: *start onboarding Rahul 9876543210*"
         )
     if not name:
-        name = "New Tenant"
-
-    # Normalize to canonical +91XXXXXXXXXX for storage
-    from src.services.room_occupancy import canonical_phone as _canon, _normalize_phone as _np3
-    phone = _canon(phone)
-    _norm3 = _np3(phone)
-
-    # Find or create Tenant (normalized lookup)
-    from sqlalchemy import func as _func3
-    result = await session.execute(
-        select(Tenant).where(
-            _func3.right(_func3.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm3
+        return (
+            "Please give the tenant's *name* with the phone number.\n\n"
+            f"Example: *start onboarding Rahul {phone}*"
         )
-    )
-    tenant = result.scalars().first()
-    if not tenant:
-        tenant = Tenant(name=name, phone=phone)
-        session.add(tenant)
-        await session.flush()  # get tenant.id
+    data = {"name": name, "phone": phone}
+    # anything after the phone number may already carry the booking terms
+    tail = desc[ph.end():] if ph else ""
+    if tail.strip():
+        data = _parse_onboarding_terms(tail, data)
+    return await _onboarding_next(data, ctx.phone, session)
 
-    # Cancel any existing onboarding session for this tenant
-    existing = await session.execute(
-        select(OnboardingSession).where(
-            OnboardingSession.tenant_id == tenant.id,
-            OnboardingSession.completed == False,
+
+async def _resolve_start_onboarding(pending, reply_text: str, action_data: dict,
+                                    session: AsyncSession) -> str:
+    from src.whatsapp.handlers._shared import is_affirmative, is_negative
+    ans = reply_text.strip().lower()
+    step = action_data.get("step", "collect")
+    if step == "confirm" and is_negative(ans):
+        return "Cancelled. No booking created."
+    if step == "confirm" and is_affirmative(ans):
+        from fastapi import HTTPException
+        from src.api.v2.bookings import QuickBookRequest, create_booking, onboarding_link
+        req = QuickBookRequest(
+            room_number=str(action_data["room"]),
+            tenant_name=action_data["name"],
+            tenant_phone=action_data["phone"],
+            checkin_date=action_data["checkin"],
+            monthly_rent=float(action_data["rent"]),
+            security_deposit=float(action_data["deposit"]),
         )
-    )
-    for old in existing.scalars().all():
-        old.completed = True
-
-    # Create fresh onboarding session (48-hour window)
-    ob = OnboardingSession(
-        tenant_id=tenant.id,
-        step="ask_dob",
-        collected_data=json.dumps({"name": tenant.name}),
-        expires_at=datetime.utcnow() + timedelta(hours=48),
-    )
-    session.add(ob)
-
-    return (
-        f"*Onboarding started for {name}*\n"
-        f"Phone: {phone}\n\n"
-        f"Ask *{name}* to WhatsApp this number.\n"
-        "They will be guided through their KYC form step by step.\n\n"
-        "_Session valid for 48 hours._"
-    )
+        try:
+            booked = await create_booking(session, req, actor=pending.phone,
+                                          audit_actor=pending.phone or "whatsapp")
+        except HTTPException as e:
+            # back to collecting so staff can fix the value (e.g. another room)
+            action_data["step"] = "collect"
+            await _save_pending(pending.phone, "START_ONBOARDING", action_data, [], session)
+            return f"Could not create the booking: {e.detail}\n\nSend the corrected value, or *cancel*."
+        obs, room = booked["obs"], booked["room"]
+        link = onboarding_link(obs.token)
+        ci = date.fromisoformat(action_data["checkin"]).strftime("%d %b %Y")
+        return (
+            f"*Booking created — {action_data['name']}*\n"
+            f"Room {room.room_number} · Rent Rs.{int(action_data['rent']):,} · "
+            f"Deposit Rs.{int(action_data['deposit']):,} · Check-in {ci}\n\n"
+            f"Forward this form link to the tenant (valid 48 hours):\n{link}\n\n"
+            "_Nothing was sent to the tenant automatically. The booking shows in "
+            "Kozzy app → Bookings once they submit._"
+        )
+    # collecting (or a correction at the confirm step)
+    merged = _parse_onboarding_terms(reply_text, {k: v for k, v in action_data.items() if k != "step"})
+    changed = any(merged.get(k) != action_data.get(k) for k in ("room", "rent", "deposit", "checkin"))
+    if not changed:
+        if step == "confirm":
+            return "__KEEP_PENDING__Reply *Yes* to create the booking, *No* to cancel, or send a corrected value (e.g. *rent 15000*)."
+        return "__KEEP_PENDING__Couldn't read that.\n" + _ONBOARD_ASK
+    # validate the room exists before going further
+    if merged.get("room") and merged.get("room") != action_data.get("room"):
+        room_row = await session.scalar(select(Room).where(Room.room_number.ilike(str(merged["room"]))))
+        if not room_row:
+            merged.pop("room")
+            reply = await _onboarding_next(merged, pending.phone, session)
+            return f"Room *{_parse_onboarding_terms(reply_text, {}).get('room')}* not found.\n\n" + reply
+    return await _onboarding_next(merged, pending.phone, session)
 
 
 # ── Offboarding / checkout record ──────────────────────────────────────────────
@@ -8349,14 +8650,9 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
             label = f"{t.name} — Room {room_obj.room_number}"
             lines.append(f"{i}. {label}")
             choices.append({"seq": i, "tenant_id": t.id, "tenancy_id": tncy.id, "label": label})
-        pending = PendingAction(
-            phone=ctx.phone,
-            intent="RECORD_CHECKOUT",
-            action_data=json.dumps({"step": "confirm_tenant"}),
-            choices=json.dumps(choices),
-            expires_at=datetime.utcnow() + timedelta(hours=4),
-        )
-        session.add(pending)
+        # _save_pending normalises the phone — a raw PendingAction(phone=ctx.phone)
+        # was never found again, so every reply after this fell through.
+        await _save_pending(ctx.phone, "RECORD_CHECKOUT", {"step": "confirm_tenant"}, choices, session)
         return "\n".join(lines)
 
     tenant, tenancy, room = rows[0]
@@ -8378,19 +8674,12 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
         )
 
     # Save pending action to track the checkout form steps
-    pending = PendingAction(
-        phone=ctx.phone,
-        intent="RECORD_CHECKOUT",
-        action_data=json.dumps({
-            "step": "ask_exit_date",
-            "tenancy_id": tenancy.id,
-            "tenant_name": tenant.name,
-            "room": room.room_number,
-        }),
-        choices=json.dumps([]),
-        expires_at=datetime.utcnow() + timedelta(hours=4),
-    )
-    session.add(pending)
+    await _save_pending(ctx.phone, "RECORD_CHECKOUT", {
+        "step": "ask_exit_date",
+        "tenancy_id": tenancy.id,
+        "tenant_name": tenant.name,
+        "room": room.room_number,
+    }, [], session)
 
     return (
         f"*Checkout Form — {tenant.name}* (Room {room.room_number})\n\n"
@@ -8445,7 +8734,8 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
     # Extract room number from description if not in entities
     if not room_num:
         import re as _re
-        m = _re.search(r"\broom\s*(\w+)", description, _re.I)
+        m = _re.search(r"\broom\s*(\w+)", description, _re.I) or \
+            _re.search(r"\b(G\d{1,3}|\d{3,4})\b", description, _re.I)  # "512 tap leaking"
         if m:
             room_num = m.group(1)
 
@@ -8458,11 +8748,12 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
 
     # Find room
     room_result = await session.execute(
-        select(Room).where(Room.room_number == room_num, Room.active == True)
+        select(Room).where(func.upper(Room.room_number) == room_num.upper(), Room.active == True)
     )
     room = room_result.scalars().first()
     if not room:
         return f"Room {room_num} not found."
+    room_num = room.room_number
 
     # Find active tenancy for that room
     tenancy_result = await session.execute(
@@ -8517,6 +8808,9 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
         notes=ticket_id,  # store ticket ID in notes field
     )
     session.add(complaint)
+    await session.flush()
+    _ops_audit(session, ctx, "complaint", complaint.id, ticket_id, "complaint_created",
+               None, (description or "")[:200], room_num)
 
     cat_label = {
         ComplaintCategory.plumbing:    "Plumbing",
@@ -8550,55 +8844,56 @@ async def _complaint_update(entities: dict, ctx: CallerContext, session: AsyncSe
     cmp_id: Optional[int] = None
 
     import re as _re
+    _open = [ComplaintStatus.open, ComplaintStatus.in_progress]
     m_ticket = _re.search(r"[A-Z]{3}[-\s]?\d{8}[-\s]?\d{3}", description, _re.I)
+    m_hash   = _re.search(r"#\s*(\d+)\b", description)
+    m_room   = _re.search(r"\b(G\d{1,3}|\d{3,4})\b", description, _re.I)
     m_num    = _re.search(r"\b(\d+)\b", description)
 
+    # Look up the complaint. Order: ticket → "#id" → room number → bare id.
+    # Room before bare id: "resolve complaint 208" means room 208, not complaint #208.
+    # No reference at all → list the open ones; never close an arbitrary complaint.
+    complaint: Optional[Complaint] = None
     if m_ticket:
         ticket_ref = m_ticket.group(0).replace(" ", "-").upper()
-    elif m_num:
-        cmp_id = int(m_num.group(1))
-
-    # Look up the complaint
-    complaint: Optional[Complaint] = None
-    if ticket_ref:
-        result = await session.execute(
+        complaint = (await session.execute(
             select(Complaint).where(Complaint.notes == ticket_ref)
-        )
-        complaint = result.scalars().first()
-    if complaint is None and cmp_id:
-        # First try as DB id
+        )).scalars().first()
+    elif m_hash:
+        cmp_id = int(m_hash.group(1))
         complaint = await session.get(Complaint, cmp_id)
-        # If not found by DB id, try as room number
-        if complaint is None:
-            room_num_str = str(cmp_id)
-            result = await session.execute(
+    elif m_room or m_num:
+        cmp_id = int(m_num.group(1)) if m_num else None   # "G10" has no bare number
+        if m_room:
+            room_open = (await session.execute(
                 select(Complaint)
                 .join(Tenancy, Complaint.tenancy_id == Tenancy.id)
                 .join(Room, Tenancy.room_id == Room.id)
-                .where(
-                    Room.room_number == room_num_str,
-                    Complaint.status.in_([ComplaintStatus.open, ComplaintStatus.in_progress]),
-                )
+                .where(func.upper(Room.room_number) == m_room.group(1).upper(),
+                       Complaint.status.in_(_open))
                 .order_by(Complaint.created_at.desc())
-                .limit(1)
-            )
-            complaint = result.scalars().first()
-    if complaint is None:
-        # Try to find most recent open complaint if no ID given
-        if not ticket_ref and not cmp_id:
-            result = await session.execute(
-                select(Complaint)
-                .where(Complaint.status.in_([ComplaintStatus.open, ComplaintStatus.in_progress]))
-                .order_by(Complaint.created_at.desc())
-                .limit(1)
-            )
-            complaint = result.scalars().first()
+            )).scalars().all()
+            if len(room_open) > 1:
+                lines = [f"Room {m_room.group(1).upper()} has {len(room_open)} open complaints — which one?"]
+                for c in room_open:
+                    lines.append(f"• *{c.notes or '#' + str(c.id)}* — {c.description[:50]}")
+                lines.append("\nReply: *resolve <ticket>*")
+                return "\n".join(lines)
+            complaint = room_open[0] if room_open else None
+        if complaint is None and cmp_id:
+            complaint = await session.get(Complaint, cmp_id)
+    else:
+        return await _query_complaints(entities, ctx, session) + (
+            "\n\nWhich one is fixed? Reply *resolve <ticket>* or *resolve complaint <room>*."
+        )
 
     if complaint is None:
         return (
             "No matching complaint found.\n"
-            "Use: *resolve XXX-YYYYMMDD-NNN* or *resolve complaint [number]*"
+            "Use: *resolve XXX-YYYYMMDD-NNN* or *resolve complaint [room]*"
         )
+    if complaint.status not in _open:
+        return f"Complaint {complaint.notes or '#' + str(complaint.id)} is already {complaint.status.value}."
 
     # Fetch room info for the reply
     tenancy = await session.get(Tenancy, complaint.tenancy_id)
@@ -8608,9 +8903,12 @@ async def _complaint_update(entities: dict, ctx: CallerContext, session: AsyncSe
         room_num = room.room_number if room else ""
 
     ticket_label = complaint.notes or f"#{complaint.id}"
+    old_status = complaint.status.value if complaint.status else None
     complaint.status      = ComplaintStatus.resolved
     complaint.resolved_at = datetime.utcnow()
     complaint.resolved_by = ctx.phone
+    _ops_audit(session, ctx, "complaint", complaint.id, ticket_label, "complaint_status",
+               old_status, "resolved", room_num)
 
     return (
         f"*Complaint Resolved*\n"
@@ -8833,7 +9131,9 @@ def _extract_activity_description(raw_message: str) -> str:
     """Strip the command prefix ('log', 'note', 'activity log') to get the description."""
     desc = raw_message.strip()
     # Remove leading command words
-    desc = re.sub(r"^(?:activity\s+log\s+|log\s+|note\s+)", "", desc, flags=re.I).strip()
+    # \b + optional space so a bare "log" / "note" strips to "" (asks for a
+    # description) instead of being saved as an entry whose text is "log".
+    desc = re.sub(r"^(?:activity\s+log|log|note)\b\s*", "", desc, flags=re.I).strip()
     return desc
 
 

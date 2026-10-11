@@ -1,0 +1,2245 @@
+{
+ "area": "edits",
+ "cases": [
+  {
+   "id": "E-001",
+   "intent": "ROOM_TRANSFER",
+   "desc": "move by full name, keep rent, skip deposit, confirm",
+   "turns": [
+    {
+     "msg": "move Vidya Dutta to room 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Room Transfer",
+      "Vidya Dutta",
+      "401",
+      "Keep current"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "deposit"
+     ]
+    },
+    {
+     "msg": "skip",
+     "expect_contains": [
+      "Confirm Room Transfer",
+      "314",
+      "401"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Room transferred",
+      "314",
+      "401"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=148",
+     "expect": "401"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='room_id' and new_value='401' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    },
+    {
+     "sql": "select agreed_rent::int from tenancies where id=148",
+     "expect": "13500"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-002",
+   "intent": "ROOM_TRANSFER",
+   "desc": "move back, Hinglish, receptionist, deposit 0",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "Vidya Dutta ko 314 mein shift karo",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Room Transfer",
+      "401",
+      "314"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "deposit"
+     ]
+    },
+    {
+     "msg": "0",
+     "expect_contains": [
+      "Confirm Room Transfer"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Room transferred"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=148",
+     "expect": "314"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='room_id' and new_value='314' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ]
+  },
+  {
+   "id": "E-003",
+   "intent": "ROOM_TRANSFER",
+   "desc": "transfer with new rent, invalid amount then valid, writes rent_revisions",
+   "turns": [
+    {
+     "msg": "transfer harshita kulkarni to 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Room Transfer",
+      "Harshita Kulkarni"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "New rent"
+     ]
+    },
+    {
+     "msg": "abc",
+     "expect_contains": [
+      "valid rent"
+     ]
+    },
+    {
+     "msg": "12000",
+     "expect_contains": [
+      "deposit"
+     ]
+    },
+    {
+     "msg": "skip",
+     "expect_contains": [
+      "11,000",
+      "12,000"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Room transferred",
+      "12,000"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number||':'||tc.agreed_rent::int from tenancies tc join rooms r on r.id=tc.room_id where tc.id=86",
+     "expect": "401:12000"
+    },
+    {
+     "sql": "select count(*) from rent_revisions where tenancy_id=86 and new_rent=12000 and effective_date=current_date",
+     "expect": "nonzero"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=86 and field='room_id' and new_value='401' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-004",
+   "intent": "ROOM_TRANSFER",
+   "desc": "move Harshita back with original rent (room change wording)",
+   "turns": [
+    {
+     "msg": "room change for Harshita Kulkarni to 317",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Room Transfer",
+      "401",
+      "317"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "New rent"
+     ]
+    },
+    {
+     "msg": "11,000",
+     "expect_contains": [
+      "deposit"
+     ]
+    },
+    {
+     "msg": "skip",
+     "expect_contains": [
+      "Confirm Room Transfer"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Room transferred"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number||':'||tc.agreed_rent::int from tenancies tc join rooms r on r.id=tc.room_id where tc.id=86",
+     "expect": "317:11000"
+    },
+    {
+     "sql": "select count(*) from rent_revisions where tenancy_id=86 and new_rent=11000 and effective_date=current_date",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-005",
+   "intent": "ROOM_TRANSFER",
+   "desc": "destination full (2 monthly tenants) -> refuse",
+   "turns": [
+    {
+     "msg": "shift Vidya Dutta to 302",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "full"
+     ],
+     "expect_not_contains": [
+      "Keep current"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=148",
+     "expect": "314"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-006",
+   "intent": "ROOM_TRANSFER",
+   "desc": "destination has a premium (whole-room) tenant -> full",
+   "turns": [
+    {
+     "msg": "move Vidya Dutta to 407",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "full"
+     ],
+     "expect_not_contains": [
+      "Keep current"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=148",
+     "expect": "314"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-007",
+   "intent": "ROOM_TRANSFER",
+   "desc": "destination 320 (premium + day-stay) -> full",
+   "turns": [
+    {
+     "msg": "move Vidya Dutta to 320",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "full"
+     ],
+     "expect_not_contains": [
+      "Keep current"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-008",
+   "intent": "ROOM_TRANSFER",
+   "desc": "ambiguous first name -> pick list -> pick -> cancel",
+   "turns": [
+    {
+     "msg": "move Neeraj to 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah",
+      "which one"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Room Transfer",
+      "Neeraj Jain",
+      "408"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=62",
+     "expect": "408"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-009",
+   "intent": "ROOM_TRANSFER",
+   "desc": "no destination given -> ask room -> answer -> cancel at rent step",
+   "turns": [
+    {
+     "msg": "transfer Vidya Dutta",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Which room"
+     ]
+    },
+    {
+     "msg": "401",
+     "expect_contains": [
+      "Room Transfer",
+      "401"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=148",
+     "expect": "314"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-010",
+   "intent": "ROOM_TRANSFER",
+   "desc": "tenant not found",
+   "turns": [
+    {
+     "msg": "move Zorawar Qwertyuiop to 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "No active tenant"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-011",
+   "intent": "ROOM_TRANSFER",
+   "desc": "destination room does not exist",
+   "turns": [
+    {
+     "msg": "move Vidya Dutta to room 999",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "999",
+      "not found"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-012",
+   "intent": "ROOM_TRANSFER",
+   "desc": "already in that room",
+   "turns": [
+    {
+     "msg": "move Vidya Dutta to 314",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "already"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-013",
+   "intent": "CHANGE_ROOM",
+   "desc": "possessive phrasing, cancel",
+   "turns": [
+    {
+     "msg": "change Vidya Dutta's room to 401",
+     "expect_intent": [
+      "ROOM_TRANSFER",
+      "CHANGE_ROOM"
+     ],
+     "expect_contains": [
+      "Room Transfer",
+      "Vidya Dutta",
+      "401"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-014",
+   "intent": "ROOM_TRANSFER",
+   "desc": "please ... from X to Y phrasing",
+   "turns": [
+    {
+     "msg": "Please move Vidya Dutta from 314 to 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Room Transfer",
+      "Vidya Dutta",
+      "401"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-015",
+   "intent": "ROOM_TRANSFER",
+   "desc": "source given as room number",
+   "turns": [
+    {
+     "msg": "move room 314 tenant to 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Vidya Dutta",
+      "401"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-016",
+   "intent": "ROOM_TRANSFER",
+   "desc": "name + 'room change' + number word order, owner",
+   "phone": "917358341775",
+   "turns": [
+    {
+     "msg": "vidya dutta room change 401",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Room Transfer",
+      "401"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-017",
+   "intent": "ROOM_TRANSFER",
+   "desc": "bare 'room transfer' asks who",
+   "turns": [
+    {
+     "msg": "room transfer",
+     "expect_intent": "ROOM_TRANSFER",
+     "expect_contains": [
+      "Who should be moved"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-018",
+   "intent": "ASSIGN_ROOM",
+   "desc": "assign room to tenant who already has an active room -> suggest move, no new tenancy",
+   "turns": [
+    {
+     "msg": "assign room 401 to Vidya Dutta",
+     "expect_intent": "ASSIGN_ROOM",
+     "expect_contains": [
+      "already",
+      "314"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from tenancies tc join tenants t on t.id=tc.tenant_id where t.name='Vidya Dutta' and tc.status='active'",
+     "expect": "1"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-019",
+   "intent": "ASSIGN_ROOM",
+   "desc": "assign room to an exited / unknown person -> refuse, never create a tenancy",
+   "turns": [
+    {
+     "msg": "assign Zorawar Qwertyuiop to room 401",
+     "expect_intent": "ASSIGN_ROOM",
+     "expect_any": [
+      "No booking",
+      "No unassigned"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-020",
+   "intent": "ASSIGN_ROOM",
+   "desc": "booked (no_show) tenant -> moves the booking via execute_room_transfer, stays no_show, no new tenancy",
+   "turns": [
+    {
+     "msg": "allot room 401 to Kavya Tiwari",
+     "expect_intent": "ASSIGN_ROOM",
+     "expect_contains": [
+      "Kavya Tiwari",
+      "401",
+      "Assign Room"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Room assigned",
+      "401"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from tenancies tc join tenants t on t.id=tc.tenant_id where t.name='Kavya Tiwari' and tc.status in ('active','no_show')",
+     "expect": "1"
+    },
+    {
+     "sql": "select r.room_number||':'||tc.status from tenancies tc join rooms r on r.id=tc.room_id where tc.id=318",
+     "expect": "401:no_show"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=318 and field='room_id' and new_value='401' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-021",
+   "intent": "ASSIGN_ROOM",
+   "desc": "'assign X to room Y' order: move the booking 401 -> 410 (cycle-safe for repeat)",
+   "turns": [
+    {
+     "msg": "assign Kavya Tiwari to room 410",
+     "expect_intent": "ASSIGN_ROOM",
+     "expect_contains": [
+      "Kavya Tiwari",
+      "410"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Room assigned",
+      "410"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from tenancies tc join tenants t on t.id=tc.tenant_id where t.name='Kavya Tiwari' and tc.status in ('active','no_show')",
+     "expect": "1"
+    },
+    {
+     "sql": "select r.room_number||':'||tc.status from tenancies tc join rooms r on r.id=tc.room_id where tc.id=318",
+     "expect": "410:no_show"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-022",
+   "intent": "ASSIGN_ROOM",
+   "desc": "assign into a full room (one tenant overdue on expected_checkout still counts) -> refuse",
+   "turns": [
+    {
+     "msg": "assign room 302 to Yukti Verma",
+     "expect_intent": "ASSIGN_ROOM",
+     "expect_contains": [
+      "full"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select r.room_number from tenancies tc join rooms r on r.id=tc.room_id where tc.id=319",
+     "expect": "320"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-030",
+   "intent": "UPDATE_RENT",
+   "desc": "change rent by full name, confirm -> rent_revisions + audit",
+   "turns": [
+    {
+     "msg": "change Vidya Dutta rent to 14000",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "Vidya Dutta",
+      "13,500",
+      "14,000"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Updated",
+      "14000"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select agreed_rent::int from tenancies where id=148",
+     "expect": "14000"
+    },
+    {
+     "sql": "select count(*) from rent_revisions where tenancy_id=148 and old_rent=13500 and new_rent=14000 and effective_date=current_date",
+     "expect": "nonzero"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='agreed_rent' and new_value like '14000%' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-031",
+   "intent": "UPDATE_RENT",
+   "desc": "'X rent is N' phrasing reverts, yes-word confirm",
+   "turns": [
+    {
+     "msg": "Vidya Dutta rent is 13500",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "14,000",
+      "13,500"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select agreed_rent::int from tenancies where id=148",
+     "expect": "13500"
+    },
+    {
+     "sql": "select count(*) from rent_revisions where tenancy_id=148 and old_rent=14000 and new_rent=13500",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-032",
+   "intent": "UPDATE_RENT",
+   "desc": "by room number with comma amount, cancel -> no change",
+   "turns": [
+    {
+     "msg": "revise rent 314 to 14,000",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "Vidya Dutta",
+      "14,000"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select agreed_rent::int from tenancies where id=148",
+     "expect": "13500"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-033",
+   "intent": "UPDATE_RENT",
+   "desc": "ambiguous first name -> list -> pick 2 -> unclear reply -> cancel",
+   "turns": [
+    {
+     "msg": "change Neeraj rent to 15000",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "Neeraj Shah",
+      "17,500",
+      "15,000"
+     ]
+    },
+    {
+     "msg": "maybe",
+     "expect_contains": [
+      "confirm"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select agreed_rent::int from tenancies where id=64",
+     "expect": "17500"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-034",
+   "intent": "UPDATE_RENT",
+   "desc": "short form 'name rent N' (receptionist)",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "vidya dutta rent 14000",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "Vidya Dutta",
+      "14,000"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-035",
+   "intent": "UPDATE_RENT",
+   "desc": "same as current rent -> no-op message",
+   "turns": [
+    {
+     "msg": "change Vidya Dutta rent to 13500",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "already"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-036",
+   "intent": "UPDATE_RENT",
+   "desc": "Hinglish 'ka rent N karo'",
+   "turns": [
+    {
+     "msg": "Vidya Dutta ka rent 14000 karo",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "14,000"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-037",
+   "intent": "UPDATE_RENT",
+   "desc": "unknown tenant",
+   "turns": [
+    {
+     "msg": "change Zorawar Qwertyuiop rent to 14000",
+     "expect_intent": "UPDATE_RENT",
+     "expect_contains": [
+      "No active tenant"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-038",
+   "intent": "RENT_CHANGE",
+   "desc": "'update rent for X to N' is RENT_CHANGE (financial) -> Kozzy app message (security decision)",
+   "turns": [
+    {
+     "msg": "update rent for Vidya Dutta to 14000",
+     "expect_intent": "RENT_CHANGE",
+     "expect_contains": [
+      "Kozzy app"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select agreed_rent::int from tenancies where id=148",
+     "expect": "13500"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-040",
+   "intent": "UPDATE_PHONE",
+   "desc": "change phone, confirm -> tenants.phone + audit",
+   "turns": [
+    {
+     "msg": "change Vidya Dutta phone to 9876500011",
+     "expect_intent": "UPDATE_PHONE",
+     "expect_contains": [
+      "9000000294",
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select right(regexp_replace(phone,'\\D','','g'),10) from tenants where id=148",
+     "expect": "9876500011"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='phone' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-041",
+   "intent": "UPDATE_PHONE",
+   "desc": "'update phone number of X to N' reverts",
+   "turns": [
+    {
+     "msg": "update phone number of Vidya Dutta to 9000000294",
+     "expect_intent": "UPDATE_PHONE",
+     "expect_contains": [
+      "9876500011",
+      "9000000294"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select right(regexp_replace(phone,'\\D','','g'),10) from tenants where id=148",
+     "expect": "9000000294"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-042",
+   "intent": "UPDATE_PHONE",
+   "desc": "short form 'X new number N', cancel",
+   "turns": [
+    {
+     "msg": "Vidya Dutta new number 9876500011",
+     "expect_intent": "UPDATE_PHONE",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select right(regexp_replace(phone,'\\D','','g'),10) from tenants where id=148",
+     "expect": "9000000294"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-043",
+   "intent": "UPDATE_PHONE",
+   "desc": "possessive + +91 prefix",
+   "turns": [
+    {
+     "msg": "set Vidya Dutta's phone to +919876500011",
+     "expect_intent": "UPDATE_PHONE",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-044",
+   "intent": "UPDATE_PHONE",
+   "desc": "ambiguous first name -> list -> pick -> cancel",
+   "turns": [
+    {
+     "msg": "update Neeraj mobile 9876500011",
+     "expect_intent": "UPDATE_PHONE",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Neeraj Jain",
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select phone from tenants where id=62",
+     "expect": "9000000122"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-045",
+   "intent": "UPDATE_PHONE",
+   "desc": "bare 'name phone N'",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "vidya dutta phone 9876500011",
+     "expect_intent": "UPDATE_PHONE",
+     "expect_contains": [
+      "9876500011"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-050",
+   "intent": "UPDATE_GENDER",
+   "desc": "change gender to male then confirm",
+   "turns": [
+    {
+     "msg": "change Vidya Dutta gender to male",
+     "expect_intent": "UPDATE_GENDER",
+     "expect_contains": [
+      "female",
+      "male"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select gender from tenants where id=148",
+     "expect": "male"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='gender' and new_value='male' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-051",
+   "intent": "UPDATE_GENDER",
+   "desc": "'X is female' reverts",
+   "turns": [
+    {
+     "msg": "Vidya Dutta is female",
+     "expect_intent": "UPDATE_GENDER",
+     "expect_contains": [
+      "female"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select gender from tenants where id=148",
+     "expect": "female"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-052",
+   "intent": "UPDATE_GENDER",
+   "desc": "ambiguous name -> pick -> confirm writes tenants.gender (not tenancy)",
+   "turns": [
+    {
+     "msg": "change Madhuri gender to male",
+     "expect_intent": "UPDATE_GENDER",
+     "expect_contains": [
+      "Madhuri Menon",
+      "Madhuri Trivedi"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Madhuri Menon",
+      "male"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select gender from tenants where id=4",
+     "expect": "male"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=4 and field='gender' and new_value='male' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-053",
+   "intent": "UPDATE_GENDER",
+   "desc": "revert via ambiguous path",
+   "turns": [
+    {
+     "msg": "set Madhuri gender female",
+     "expect_intent": "UPDATE_GENDER",
+     "expect_contains": [
+      "Madhuri Menon",
+      "Madhuri Trivedi"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Madhuri Menon",
+      "female"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select gender from tenants where id=4",
+     "expect": "female"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-054",
+   "intent": "UPDATE_GENDER",
+   "desc": "already that gender -> no-op",
+   "turns": [
+    {
+     "msg": "Vidya Dutta gender female",
+     "expect_intent": "UPDATE_GENDER",
+     "expect_contains": [
+      "already"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-060",
+   "intent": "UPDATE_SHARING_TYPE",
+   "desc": "double -> single, confirm, prompts for rent",
+   "turns": [
+    {
+     "msg": "change Vidya Dutta to single sharing",
+     "expect_intent": "UPDATE_SHARING_TYPE",
+     "expect_contains": [
+      "double",
+      "single"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Updated",
+      "Rent is currently"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select sharing_type from tenancies where id=148",
+     "expect": "single"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='sharing_type' and new_value='single' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-061",
+   "intent": "UPDATE_SHARING_TYPE",
+   "desc": "'update sharing type of X to double' reverts",
+   "turns": [
+    {
+     "msg": "update sharing type of Vidya Dutta to double",
+     "expect_intent": "UPDATE_SHARING_TYPE",
+     "expect_contains": [
+      "single",
+      "double"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "Updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select sharing_type from tenancies where id=148",
+     "expect": "double"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-062",
+   "intent": "UPDATE_SHARING_TYPE",
+   "desc": "premium refused when room has another tenant",
+   "turns": [
+    {
+     "msg": "Abhinav Rastogi is premium",
+     "expect_intent": "UPDATE_SHARING_TYPE",
+     "expect_contains": [
+      "Ojasvi Bhandari"
+     ],
+     "expect_not_contains": [
+      "Reply *1* to confirm"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select sharing_type from tenancies where id=255",
+     "expect": "double"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-063",
+   "intent": "UPDATE_SHARING_TYPE",
+   "desc": "'make X premium' when alone -> confirm prompt -> cancel",
+   "turns": [
+    {
+     "msg": "make Vidya Dutta premium",
+     "expect_intent": "UPDATE_SHARING_TYPE",
+     "expect_contains": [
+      "Vidya Dutta",
+      "premium"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select sharing_type from tenancies where id=148",
+     "expect": "double"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-064",
+   "intent": "UPDATE_SHARING_TYPE",
+   "desc": "by room number",
+   "turns": [
+    {
+     "msg": "room 314 single sharing",
+     "expect_intent": "UPDATE_SHARING_TYPE",
+     "expect_contains": [
+      "Vidya Dutta",
+      "single"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-065",
+   "intent": "UPDATE_SHARING_TYPE",
+   "desc": "ambiguous name -> list",
+   "turns": [
+    {
+     "msg": "change Neeraj to triple sharing",
+     "expect_intent": "UPDATE_SHARING_TYPE",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-070",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "rent history by name shows revisions",
+   "turns": [
+    {
+     "msg": "rent history Vidya Dutta",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_contains": [
+      "Vidya Dutta",
+      "Rent History",
+      "14,000"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-071",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "rent history by room",
+   "turns": [
+    {
+     "msg": "rent history room 314",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_contains": [
+      "Vidya Dutta"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-072",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "show rent changes for X (not audit)",
+   "turns": [
+    {
+     "msg": "show rent changes for Harshita Kulkarni",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_contains": [
+      "Harshita Kulkarni",
+      "Room transfer"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-073",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "ambiguous name -> pick list -> pick",
+   "phone": "917358341775",
+   "turns": [
+    {
+     "msg": "rent history Neeraj",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "Neeraj Shah",
+      "17,500"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-074",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "check rent history of X",
+   "turns": [
+    {
+     "msg": "check rent history of Vidya Dutta",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_contains": [
+      "Vidya Dutta"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-075",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "rent revisions for X, receptionist",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "rent revisions for Vidya Dutta",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_contains": [
+      "Vidya Dutta"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-076",
+   "intent": "QUERY_RENT_HISTORY",
+   "desc": "unknown tenant",
+   "turns": [
+    {
+     "msg": "rent history Zorawar Qwertyuiop",
+     "expect_intent": "QUERY_RENT_HISTORY",
+     "expect_any": [
+      "No active tenant",
+      "Couldn't find"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-080",
+   "intent": "QUERY_AUDIT",
+   "desc": "changes for tenant",
+   "turns": [
+    {
+     "msg": "show changes for Vidya Dutta",
+     "expect_intent": "QUERY_AUDIT",
+     "expect_contains": [
+      "Vidya Dutta",
+      "agreed_rent"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-081",
+   "intent": "QUERY_AUDIT",
+   "desc": "who changed room",
+   "turns": [
+    {
+     "msg": "who changed room 314",
+     "expect_intent": "QUERY_AUDIT",
+     "expect_contains": [
+      "Room 314"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-082",
+   "intent": "QUERY_AUDIT",
+   "desc": "audit log (all)",
+   "turns": [
+    {
+     "msg": "audit log",
+     "expect_intent": "QUERY_AUDIT",
+     "expect_contains": [
+      "Recent changes"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-083",
+   "intent": "QUERY_AUDIT",
+   "desc": "history of tenant, receptionist",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "history of Harshita Kulkarni",
+     "expect_intent": "QUERY_AUDIT",
+     "expect_contains": [
+      "Harshita Kulkarni"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-084",
+   "intent": "QUERY_AUDIT",
+   "desc": "what changed for room",
+   "turns": [
+    {
+     "msg": "what changed for room 401",
+     "expect_intent": "QUERY_AUDIT",
+     "expect_contains": [
+      "401"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-085",
+   "intent": "QUERY_AUDIT",
+   "desc": "no records",
+   "turns": [
+    {
+     "msg": "show changes for Zorawar Qwertyuiop",
+     "expect_intent": "QUERY_AUDIT",
+     "expect_contains": [
+      "No audit records"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-090",
+   "intent": "UPDATE_TENANT_NOTES",
+   "desc": "set notes, confirm -> tenancy.notes + audit by caller",
+   "turns": [
+    {
+     "msg": "update notes for Vidya Dutta",
+     "expect_intent": "UPDATE_TENANT_NOTES",
+     "expect_contains": [
+      "Vidya Dutta",
+      "Type new"
+     ]
+    },
+    {
+     "msg": "Pays rent by UPI on the 5th",
+     "expect_contains": [
+      "Pays rent by UPI",
+      "Yes"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select notes from tenancies where id=148",
+     "expect": "Pays rent by UPI on the 5th"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='notes' and changed_by like '%9444296681' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-091",
+   "intent": "GET_TENANT_NOTES",
+   "desc": "read notes by name",
+   "turns": [
+    {
+     "msg": "notes for Vidya Dutta",
+     "expect_intent": "GET_TENANT_NOTES",
+     "expect_contains": [
+      "Pays rent by UPI",
+      "314"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-092",
+   "intent": "GET_TENANT_NOTES",
+   "desc": "read notes by room",
+   "turns": [
+    {
+     "msg": "notes room 314",
+     "expect_intent": "GET_TENANT_NOTES",
+     "expect_contains": [
+      "Pays rent by UPI"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-093",
+   "intent": "GET_TENANT_NOTES",
+   "desc": "'X notes' short form, receptionist",
+   "phone": "917680814628",
+   "turns": [
+    {
+     "msg": "Vidya Dutta notes",
+     "expect_intent": "GET_TENANT_NOTES",
+     "expect_contains": [
+      "Pays rent by UPI"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-094",
+   "intent": "GET_TENANT_NOTES",
+   "desc": "ambiguous -> pick -> shows room NUMBER not id",
+   "turns": [
+    {
+     "msg": "notes for Neeraj",
+     "expect_intent": "GET_TENANT_NOTES",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah"
+     ]
+    },
+    {
+     "msg": "2",
+     "expect_contains": [
+      "Neeraj Shah",
+      "413"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-095",
+   "intent": "GET_TENANT_NOTES",
+   "desc": "agreed terms phrasing",
+   "turns": [
+    {
+     "msg": "agreed terms for Vidya Dutta",
+     "expect_intent": "GET_TENANT_NOTES",
+     "expect_contains": [
+      "Vidya Dutta"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-096",
+   "intent": "GET_TENANT_NOTES",
+   "desc": "no notes on record",
+   "turns": [
+    {
+     "msg": "check notes of Neeraj Shah",
+     "expect_intent": "GET_TENANT_NOTES",
+     "expect_contains": [
+      "no agreed terms"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-097",
+   "intent": "UPDATE_TENANT_NOTES",
+   "desc": "edit notes, then cancel at confirm -> unchanged",
+   "turns": [
+    {
+     "msg": "edit notes room 314",
+     "expect_intent": "UPDATE_TENANT_NOTES",
+     "expect_contains": [
+      "Pays rent by UPI"
+     ]
+    },
+    {
+     "msg": "Cash only",
+     "expect_contains": [
+      "Cash only"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select notes from tenancies where id=148",
+     "expect": "Pays rent by UPI on the 5th"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-098",
+   "intent": "UPDATE_TENANT_NOTES",
+   "desc": "'clear notes for X' one-shot delete",
+   "turns": [
+    {
+     "msg": "clear notes for Vidya Dutta",
+     "expect_intent": "UPDATE_TENANT_NOTES",
+     "expect_contains": [
+      "Clear these notes"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "updated"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select coalesce(notes,'NULL') from tenancies where id=148",
+     "expect": "NULL"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_id=148 and field='notes' and new_value is null and old_value='Pays rent by UPI on the 5th' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-099",
+   "intent": "UPDATE_TENANT_NOTES",
+   "desc": "'add note for X' + 'update X notes' route to update flow",
+   "turns": [
+    {
+     "msg": "add note for Vidya Dutta",
+     "expect_intent": "UPDATE_TENANT_NOTES",
+     "expect_contains": [
+      "Type new"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "update vidya dutta notes",
+     "expect_intent": "UPDATE_TENANT_NOTES",
+     "expect_contains": [
+      "Type new"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-100",
+   "intent": "UPDATE_TENANT_NOTES",
+   "desc": "ambiguous -> pick -> enter -> cancel",
+   "turns": [
+    {
+     "msg": "update notes for Neeraj",
+     "expect_intent": "UPDATE_TENANT_NOTES",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Neeraj Shah"
+     ]
+    },
+    {
+     "msg": "1",
+     "expect_contains": [
+      "Neeraj Jain",
+      "Type new"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-110",
+   "intent": "BLACKLIST_ADD",
+   "desc": "add with reason -> row + audit",
+   "turns": [
+    {
+     "msg": "blacklist Rocky Bhai reason fought with tenants",
+     "expect_intent": "BLACKLIST_ADD",
+     "expect_contains": [
+      "Rocky Bhai",
+      "blacklist"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active",
+     "expect": "1"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='blacklist' and entity_name='Rocky Bhai' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-111",
+   "intent": "BLACKLIST_ADD",
+   "desc": "duplicate add -> already blacklisted, no second row",
+   "turns": [
+    {
+     "msg": "ban Rocky Bhai reason again",
+     "expect_intent": "BLACKLIST_ADD",
+     "expect_contains": [
+      "already"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active",
+     "expect": "1"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-112",
+   "intent": "SHOW_BLACKLIST",
+   "desc": "show blacklist",
+   "turns": [
+    {
+     "msg": "show blacklist",
+     "expect_intent": "SHOW_BLACKLIST",
+     "expect_contains": [
+      "Rocky Bhai",
+      "fought with tenants"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-113",
+   "intent": "SHOW_BLACKLIST",
+   "desc": "who is blacklisted / bare 'blacklist'",
+   "phone": "917358341775",
+   "turns": [
+    {
+     "msg": "who is blacklisted",
+     "expect_intent": "SHOW_BLACKLIST",
+     "expect_contains": [
+      "Rocky Bhai"
+     ]
+    },
+    {
+     "msg": "blacklist",
+     "expect_intent": "SHOW_BLACKLIST",
+     "expect_contains": [
+      "Rocky Bhai"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-114",
+   "intent": "BLACKLIST_REMOVE",
+   "desc": "remove by name, confirm",
+   "turns": [
+    {
+     "msg": "remove Rocky Bhai from blacklist",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "Rocky Bhai",
+      "yes"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "removed"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active",
+     "expect": "0"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='blacklist' and entity_name='Rocky Bhai' and new_value='removed' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-115",
+   "intent": "BLACKLIST_ADD",
+   "desc": "add without reason -> asks reason -> reason given",
+   "turns": [
+    {
+     "msg": "add Rocky Bhai to blacklist",
+     "expect_intent": "BLACKLIST_ADD",
+     "expect_contains": [
+      "Rocky Bhai",
+      "reason"
+     ]
+    },
+    {
+     "msg": "unpaid dues",
+     "expect_contains": [
+      "added"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active and reason='unpaid dues'",
+     "expect": "1"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-116",
+   "intent": "BLACKLIST_REMOVE",
+   "desc": "unblacklist by name, cancel then remove",
+   "turns": [
+    {
+     "msg": "unblacklist Rocky Bhai",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "Rocky Bhai"
+     ]
+    },
+    {
+     "msg": "no",
+     "expect_contains": [
+      "Cancelled"
+     ]
+    },
+    {
+     "msg": "unblock Rocky Bhai",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "Rocky Bhai"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "removed"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active",
+     "expect": "0"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-117",
+   "intent": "BLACKLIST_ADD",
+   "desc": "blacklist by phone number -> stored as phone",
+   "turns": [
+    {
+     "msg": "blacklist 9876512345 reason fake id",
+     "expect_intent": "BLACKLIST_ADD",
+     "expect_contains": [
+      "9876512345"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where phone like '%9876512345' and is_active",
+     "expect": "1"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-118",
+   "intent": "BLACKLIST_REMOVE",
+   "desc": "remove by phone number (not treated as an id)",
+   "turns": [
+    {
+     "msg": "unblacklist 9876512345",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "9876512345"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "removed"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where phone like '%9876512345' and is_active",
+     "expect": "0"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-119",
+   "intent": "BLACKLIST_ADD",
+   "desc": "'do not admit X reason Y'",
+   "phone": "917358341775",
+   "turns": [
+    {
+     "msg": "do not admit Rocky Bhai reason damaged property",
+     "expect_intent": "BLACKLIST_ADD",
+     "expect_contains": [
+      "Rocky Bhai"
+     ]
+    },
+    {
+     "msg": "unblacklist Rocky Bhai",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "Rocky Bhai"
+     ]
+    },
+    {
+     "msg": "yes",
+     "expect_contains": [
+      "removed"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active",
+     "expect": "0"
+    }
+   ]
+  },
+  {
+   "id": "E-120",
+   "intent": "BLACKLIST_ADD",
+   "desc": "add without reason -> cancel",
+   "turns": [
+    {
+     "msg": "ban Rocky Bhai",
+     "expect_intent": "BLACKLIST_ADD",
+     "expect_contains": [
+      "reason"
+     ]
+    },
+    {
+     "msg": "cancel",
+     "expect_contains": [
+      "cancel"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select count(*) from blacklist where name='Rocky Bhai' and is_active",
+     "expect": "0"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-121",
+   "intent": "BLACKLIST_REMOVE",
+   "desc": "remove unknown id / name",
+   "turns": [
+    {
+     "msg": "unblacklist 99999",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "No active blacklist entry"
+     ]
+    },
+    {
+     "msg": "unblacklist Nobody Atall",
+     "expect_intent": "BLACKLIST_REMOVE",
+     "expect_contains": [
+      "No active blacklist entry"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-130",
+   "intent": "UPDATE_ROOM",
+   "desc": "add AC / remove AC on empty room -> audit",
+   "turns": [
+    {
+     "msg": "room 401 add AC",
+     "expect_intent": "UPDATE_ROOM",
+     "expect_contains": [
+      "401",
+      "AC = *Yes*"
+     ]
+    },
+    {
+     "msg": "room 401 no ac",
+     "expect_intent": "UPDATE_ROOM",
+     "expect_contains": [
+      "AC = *No*"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select has_ac from rooms where room_number='401'",
+     "expect": "False"
+    },
+    {
+     "sql": "select count(*) from audit_log where entity_type='room' and room_number='401' and field='has_ac' and created_at>now()-interval '3 hours'",
+     "expect": "nonzero"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-131",
+   "intent": "UPDATE_ROOM",
+   "desc": "maintenance on/off on empty room",
+   "turns": [
+    {
+     "msg": "room 401 under maintenance",
+     "expect_intent": "UPDATE_ROOM",
+     "expect_contains": [
+      "maintenance"
+     ]
+    },
+    {
+     "msg": "room 401 maintenance done",
+     "expect_intent": "UPDATE_ROOM",
+     "expect_contains": [
+      "active"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select active from rooms where room_number='401'",
+     "expect": "True"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-132",
+   "intent": "UPDATE_ROOM",
+   "desc": "maintenance on an occupied room is refused",
+   "turns": [
+    {
+     "msg": "room 302 under maintenance",
+     "expect_intent": "UPDATE_ROOM",
+     "expect_contains": [
+      "Abhinav Rastogi"
+     ]
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select active from rooms where room_number='302'",
+     "expect": "True"
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-133",
+   "intent": "UPDATE_ROOM",
+   "desc": "room type set (no-op value on a single room) -> audit",
+   "turns": [
+    {
+     "msg": "room 401 type single",
+     "expect_intent": "UPDATE_ROOM",
+     "expect_contains": [
+      "type = *single*"
+     ]
+    }
+   ],
+   "phone": "919444296681"
+  },
+  {
+   "id": "E-140",
+   "intent": "BLOCKED",
+   "desc": "tenant phone gets no reply on edit command",
+   "phone": "919000000294",
+   "turns": [
+    {
+     "msg": "change my phone to 9876500011",
+     "expect_silent": true
+    }
+   ],
+   "db_checks": [
+    {
+     "sql": "select right(regexp_replace(phone,'\\D','','g'),10) from tenants where id=148",
+     "expect": "9000000294"
+    }
+   ]
+  }
+ ]
+}

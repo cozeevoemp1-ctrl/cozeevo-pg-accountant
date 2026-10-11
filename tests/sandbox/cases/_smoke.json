@@ -1,0 +1,5 @@
+{"area":"smoke","cases":[
+ {"id":"S-001","intent":"QUERY_OCCUPANCY","turns":[{"msg":"occupancy","expect_intent":"QUERY_OCCUPANCY","expect_contains":["beds"]}],"expect_outbound":0},
+ {"id":"S-002","intent":"BLOCKED","phone":"919999900001","turns":[{"msg":"hi what is my balance","expect_silent":true}],"expect_outbound":0},
+ {"id":"S-003","intent":"PAYMENT_LOG","turns":[{"msg":"Raj paid 5000 cash","expect_intent":"PAYMENT_LOG","expect_contains":["Kozzy app"]}]}
+]}

@@ -287,22 +287,3 @@ async def get_category_by_name(name: str) -> Optional[ExpenseCategory]:
         return await session.scalar(
             select(ExpenseCategory).where(ExpenseCategory.name == name)
         )
-
-
-# ── Pending entities (legacy stubs) ───────────────────────────────────────
-# The new schema has no pending_entities table.
-# These stubs keep main.py entity_router from crashing.
-
-async def get_pending_entities(entity_type: Optional[str] = None) -> list:
-    """No pending_entities table in new schema — returns empty list."""
-    return []
-
-
-async def approve_pending_entity(pending_id: int) -> Optional[dict]:
-    """No pending_entities table in new schema."""
-    return None
-
-
-async def reject_pending_entity(pending_id: int):
-    """No pending_entities table in new schema."""
-    pass

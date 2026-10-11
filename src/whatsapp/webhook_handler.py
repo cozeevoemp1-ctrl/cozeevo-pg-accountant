@@ -90,8 +90,8 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     Meta WhatsApp Cloud API webhook.
     1. Verify Meta HMAC signature (rejects fakes)
     2. Parse Meta's nested JSON payload
-    3. Detect master-data approval reply (approve/reject <id>)
-    4. Pass through the same bot brain as /api/whatsapp/process
+    3. Staff-only media pre-processing (voice transcription, bank statement upload)
+    4. Pass through the same bot brain as /api/whatsapp/process (role gate lives there)
     5. Send reply via Meta Graph API (background task)
     """
     raw_body = await request.body()
@@ -181,25 +181,14 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
         _wdbg.write(f"[{from_number}] msg={body[:60]} msg_id={msg_id[:30] if msg_id else '-'}\n")
 
-    # -- Master data approval replies ------------------------------------------
-    import re
-    approve_m = re.match(r"approve\s+(\d+)", body.strip(), re.I)
-    reject_m  = re.match(r"reject\s+(\d+)",  body.strip(), re.I)
-
-    if approve_m:
-        pid = int(approve_m.group(1))
-        from src.database.db_manager import approve_pending_entity
-        result = await approve_pending_entity(pid)
-        reply = f"Approved: {result.get('name', pid)}" if result else f"Not found: #{pid}"
-        background.add_task(_send_whatsapp, from_number, reply)
-        return {"status": "ok"}
-
-    if reject_m:
-        pid = int(reject_m.group(1))
-        from src.database.db_manager import reject_pending_entity
-        await reject_pending_entity(pid)
-        background.add_task(_send_whatsapp, from_number, f"Rejected: #{pid}")
-        return {"status": "ok"}
+    # -- Role gate for the pre-pipeline branches below ------------------------
+    # Everything that replies BEFORE process_message (voice-failure notice,
+    # statement upload) must check the allowlist itself — otherwise a tenant or
+    # unknown number gets a bot reply. Non-staff fall through to process_message,
+    # which logs the inbound message (keeps the 24-hr window record that
+    # tenant_delivery relies on) and returns skip — i.e. silence.
+    from src.whatsapp.role_service import is_allowlisted
+    _is_staff = is_allowlisted(from_number)
 
     # -- Handle media ---------------------------------------------------------
     _STATEMENT_MIMES = {
@@ -212,7 +201,7 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     }
     _STATEMENT_EXTS = {".pdf", ".xlsx", ".xls", ".csv", ".txt"}
 
-    if media_id:
+    if media_id and _is_staff:
         base_mime = (media_mime or "").split(";")[0].strip()
         fname_ext = ("." + media_name.rsplit(".", 1)[-1].lower()) if "." in media_name else ""
 

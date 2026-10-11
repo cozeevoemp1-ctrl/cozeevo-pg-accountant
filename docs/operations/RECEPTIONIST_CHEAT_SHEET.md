@@ -1,27 +1,16 @@
 # Cozeevo Help Desk — Full Command Cheat Sheet
 
 > Send any of these messages to the WhatsApp bot. You can use your own words — the bot understands variations.
+>
+> **What works on WhatsApp (staff phones only):** check-in form link, checkout, notice, room / vacancy / occupancy queries, complaints, staff, vendor contacts, WiFi, vacations, rules, chit register (Kiran + Prabhakaran). **Payments, dues, expenses, reports, refunds and reminders are Kozzy-app only** — sections marked *app only* are kept so you know where each thing went. Type **help** in WhatsApp for the live menu.
 
 ---
 
 ## ADMIN / POWER USER COMMANDS
 
-### COLLECT RENT (Payment)
+### COLLECT RENT (Payment) — app only
 
-| Message | What it does |
-|---------|-------------|
-| **collect rent** | Step-by-step: Who? → Cash? → UPI? → Confirm |
-| **Raj paid 14000 cash** | Quick log — confirms and saves |
-| **Raj 14000 upi** | Short form — name + amount + mode |
-| **Priya paid 8000 gpay** | GPay payment |
-| **15000 Raj gpay** | Amount-first shorthand |
-| **record payment** | Start step-by-step form |
-| **Raj payment received** | Log without explicit amount (uses most recent) |
-| **Raj paid fifteen thousand** | Word-number payment |
-
-Split payment (cash + UPI): Use "collect rent", enter cash amount, then UPI amount separately.
-
-Bot shows dues summary (all months + notes) before asking for amounts.
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
@@ -29,11 +18,8 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 | Message | What it does |
 |---------|-------------|
-| **add tenant** | Step-by-step form (name → phone → room → rent → deposit → maintenance → date → confirm) |
+| **add tenant** | Replies with the onboarding form link — check-in happens in the form / Kozzy app, not in chat |
 | **new tenant** | Same |
-| **checkin Priya** | Starts form with name pre-filled |
-| **new admission** | Same as add tenant |
-| **register tenant** | Same |
 
 ---
 
@@ -102,31 +88,13 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 ### WHO OWES / DUES
 
-| Message | What it does |
-|---------|-------------|
-| **who owes** | List all unpaid tenants this month |
-| **who hasn't paid** | Same |
-| **dues this month** | Same |
-| **defaulters** | Same |
-| **pending dues** | Same |
-| **outstanding dues** | Same |
-| **show unpaid** | Same |
-| **baki** | Same (Hindi) |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### TENANT ACCOUNT / QUERY
 
-| Message | What it does |
-|---------|-------------|
-| **Raj balance** | Shows Raj's payment history + balance |
-| **how much does Raj owe** | Same |
-| **Raj payment history** | Same |
-| **Raj account** | Same |
-| **balance of Raj** | Same |
-| **show Raj account** | Same |
-| **did Raj pay this month?** | Check if tenant paid |
-| **what is the rent for Raj** | Shows rent info |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
@@ -143,13 +111,12 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 ### DASHBOARD SUMMARY
 
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
+
+Still on WhatsApp:
+
 | Message | What it does |
 |---------|-------------|
-| **show dashboard** | All 6 rows: occupancy, buildings, collection, status, notice, deposits |
-| **dashboard** | Same |
-| **dashboard summary** | Same |
-| **all stats** | Same |
-| **full overview** | Same |
 | **show master data** | Live DB snapshot: staff rooms + revenue bed counts by building |
 | **master data summary** | Same |
 
@@ -157,38 +124,19 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 ### REPORTS
 
-| Message | What it does |
-|---------|-------------|
-| **report** | Current month: income, expenses, occupancy |
-| **report March** | Specific month report |
-| **report 2026** | Yearly report — all months at a glance |
-| **yearly report** | Same |
-| **monthly report** | Same |
-| **P&L** | Same |
-| **how much cash collected** | Cash collection query |
-| **how much UPI this month** | UPI collection query |
-| **total collected** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### BANK REPORT
 
-| Message | What it does |
-|---------|-------------|
-| **bank report** | Bank statement P&L / analysis |
-| **bank statement report** | Same |
-| **bank P&L** | Same |
-| **income expense report** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### BANK DEPOSIT MATCH
 
-| Message | What it does |
-|---------|-------------|
-| **match deposits** | Match bank deposits to tenants |
-| **check deposits** | Same |
-| **identify deposits** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
@@ -244,41 +192,19 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 ### LOG EXPENSE
 
-| Message | What it does |
-|---------|-------------|
-| **log expense** | Step-by-step: category → amount → description → confirm |
-| **electricity 4500** | Quick log — auto-categorized |
-| **salary 12000** | Quick log |
-| **plumber 2000** | Quick log as maintenance |
-| **maintenance 3000 cash** | With payment mode |
-| **5000 cash maintenance** | Amount-first shorthand |
-| **paid electricity bill 4500** | Bill payment |
-| **internet 1800** | Quick log |
-| **diesel 3000** | Quick log |
-| **generator maintenance** | Quick log |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### VOID / CANCEL PAYMENT
 
-| Message | What it does |
-|---------|-------------|
-| **void payment Raj** | Shows Raj's recent payment → confirm void |
-| **cancel payment Raj** | Same |
-| **wrong payment** | Asks which tenant |
-| **undo payment** | Same |
-| **reverse payment** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### VOID / CANCEL EXPENSE
 
-| Message | What it does |
-|---------|-------------|
-| **void expense** | Shows recent expenses → confirm void |
-| **cancel expense** | Same |
-| **wrong expense** | Same |
-| **delete expense** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
@@ -322,57 +248,31 @@ Values: `single`, `double`, `triple`, `premium`.
 
 ### RENT DISCOUNT / CONCESSION
 
-| Message | What it does |
-|---------|-------------|
-| **concession for Raj** | One-time rent reduction |
-| **discount this month** | Same |
-| **waive 1000** | Same |
-| **extra charge for electricity** | Add surcharge |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### DEPOSIT CHANGE
 
-| Message | What it does |
-|---------|-------------|
-| **change deposit for Raj** | Update deposit amount |
-| **deposit correction** | Same |
-| **increase deposit** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### REFUNDS
 
-| Message | What it does |
-|---------|-------------|
-| **add refund Raj 5000** | Record deposit refund with amount |
-| **return deposit Raj** | Same |
-| **pending refunds** | List all pending deposit refunds |
-| **refund status** | Same |
-| **show refunds** | Same |
-| **refund history** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
 ### BULK REMINDER
 
-| Message | What it does |
-|---------|-------------|
-| **remind unpaid** | Lists all unpaid tenants + queues reminders |
-| **remind all** | Same |
-| **send reminder** | Same |
-| **send reminder to all** | Same |
-| **bulk reminder** | Same |
+> **Switched off.** Rule: zero automated messages to tenants. **remind unpaid**, **remind all**, **send reminder to all**, **bulk reminder**, **sabko reminder bhejo** all reply that reminders are off — nothing is queued or sent. Check who is unpaid in the Kozzy app and message them yourself.
 
 ---
 
 ### SET REMINDER (Individual)
 
-| Message | What it does |
-|---------|-------------|
-| **remind Raj tomorrow** | Set personal reminder |
-| **set reminder** | Same |
-| **reminder Deepak March 5** | Same, with date |
+> **Switched off.** **remind Raj tomorrow** / **set reminder** reply that the bot sends no scheduled messages — nothing is set.
 
 ---
 
@@ -380,10 +280,13 @@ Values: `single`, `double`, `triple`, `premium`.
 
 | Message | What it does |
 |---------|-------------|
-| **complaint fan not working room 301** | Registers complaint |
-| **AC broken room 205** | Same |
-| **report plumbing issue** | Same |
-| **tap leak room 102** | Same |
+| **no water room 512** | Logs a complaint for the tenant in that room (ticket e.g. PLU-20261011-001) |
+| **room 512 fan not working** | Same |
+| **512 tap leaking** | Same — room number without the word "room" works |
+| **complaint room 513 wifi issue** | Same |
+| **room g10 fan kharab** | Same (Hinglish, lowercase G rooms ok) |
+
+A second open complaint of the same category for the same room is not created. A room with no active tenant (vacant / staff room) can't take a complaint — complaints are tied to a tenancy.
 
 ---
 
@@ -391,11 +294,11 @@ Values: `single`, `double`, `triple`, `premium`.
 
 | Message | What it does |
 |---------|-------------|
-| **show complaints** | List all open/pending complaints |
-| **pending complaints** | Same |
-| **resolve CMP001** | Mark complaint as resolved |
-| **close complaint 3** | Same |
-| **complaint solved CMP002** | Same |
+| **show complaints** / **open complaints** / **complaint status** / **kitne complaints hai** | List open complaints |
+| **resolve complaint 512** | Resolves the open complaint in room 512 (asks which, if the room has more than one) |
+| **resolve PLU-20261011-001** | Resolve by ticket |
+| **resolve complaint #5** | Resolve by the #number shown in the list |
+| **close complaint** (no number) | Shows the open list and asks which — never closes one on its own |
 
 ---
 
@@ -426,9 +329,10 @@ Values: `single`, `double`, `triple`, `premium`.
 
 | Message | What it does |
 |---------|-------------|
-| **wifi password** | Shows current WiFi password |
-| **set wifi password newpass123** | Update WiFi password |
-| **change wifi** | Same |
+| **wifi password** / **net ka password batao** | All networks + passwords |
+| **wifi pass thor** | THOR only |
+| **wifi password hulk floor 2** | One block + floor |
+| **update wifi thor Cozeevo T2 password newpass1** | Change one network's password (written to audit log) |
 
 ---
 
@@ -479,12 +383,12 @@ Values: `single`, `double`, `triple`, `premium`.
 
 | Message | What it does |
 |---------|-------------|
-| **add plumber Ravi 9876543210** | Save vendor contact |
-| **add contact** | Same |
-| **show plumber contact** | Look up vendor |
-| **electrician number** | Same |
-| **vendor list** | List all contacts |
-| **all contacts** | Same |
+| **add plumber Ravi 9876543210** | Save vendor — asks notes, then Yes to save |
+| **add contact** | Step-by-step: name → phone → category → notes → confirm |
+| **plumber contact** / **plumber kaun hai** / **who is our plumber** | Look up vendor |
+| **Ravi number** | Look up by name |
+| **all contacts** / **show vendors** | List all contacts |
+| **update contact Ravi** / **edit vendor Ravi** | Change phone and/or notes (confirm) |
 
 ---
 
@@ -523,13 +427,7 @@ Values: `single`, `double`, `triple`, `premium`.
 
 ### EXPENSE QUERY
 
-| Message | What it does |
-|---------|-------------|
-| **expenses this month** | Show expense breakdown |
-| **what did we spend** | Same |
-| **total expenses** | Same |
-| **March expenses** | Expenses for a specific month |
-| **expense summary** | Same |
+> **Kozzy app only — not available on WhatsApp.** Finance commands are blocked for every role (security decision, 25 May 2026): the bot replies *"Finance queries are not available via WhatsApp"*. Use the Kozzy app.
 
 ---
 
@@ -537,19 +435,16 @@ Values: `single`, `double`, `triple`, `premium`.
 
 | Message | What it does |
 |---------|-------------|
-| **Raj on vacation** | Log tenant absence |
-| **Raj going home for 10 days** | Same, with duration |
-| **Priya on leave from Monday** | Same |
-| **Raj chutti pe hai** | Same (Hindi) |
+| **Raj vacation from 15 Oct to 20 Oct** | Logs a tenant's absence (rent unchanged) |
+| **Neha going home from 10 Dec for 4 days** | Same, with duration |
+| **Lokesh on leave from 15 oct to 18 oct** | Employee leave (Lokesh / Dilip) → Operations log in the Kozzy app |
+| **Raj on vacation** (no dates) | Asks you to resend with dates in one message |
 
 ---
 
-### ADD PARTNER / STAFF (BOT ACCESS)
+### ADD PARTNER (BOT ACCESS) — not on WhatsApp
 
-| Message | What it does |
-|---------|-------------|
-| **add partner** | Add admin/power user to bot |
-| **give access** | Same |
+> **Not possible from WhatsApp.** Bot access is a hardcoded allowlist in `src/whatsapp/role_service.py`. **add partner** / **give access** reply that it is set in code by the admin. ("add staff" is the staff register below, not bot access.)
 
 ---
 
@@ -558,15 +453,13 @@ Values: `single`, `double`, `triple`, `premium`.
 | Message | What it does |
 |---------|-------------|
 | **show staff rooms** | List all staff rooms + who lives there + KYC status |
-| **add staff Raju \| Security \| 8000 \| 15-06-1990 \| 9876543210 \| 1234-5678-9012** | Register new staff — name \| role \| salary \| dob \| phone \| aadhar |
-| **add staff Raju \| Security \| 8000 \| 15-06-1990 \| 9876543210 \| 1234-5678-9012 \| room G05** | Same + assign to room immediately |
-| *(after add staff — send photo/PDF)* | Upload Aadhar / ID card → KYC saved to Supabase |
-| *(reply "skip")* | Skip KYC for now — staff marked KYC pending |
-| **staff Raju room G05** | Assign existing staff to a room |
-| **staff Raju exit** | Mark staff as exited, room flips back to revenue if empty |
-| **staff Raju left** | Same |
+| **add staff Raju \| Security \| 8000 \| 15-06-1990 \| 9876543210 \| 1234-5678-9012 \| room G05** | Register new staff — name \| role \| salary \| dob (dd-mm-yyyy) \| phone \| aadhar \| room |
+| **add staff Raju** | Register with name only |
+| *(after add staff — send photo/PDF, or reply "skip")* | KYC upload / skip |
+| **staff Raju room G05** / **assign staff Raju to 701** / **move staff Raju to 702** / **staff raju 702 mein** | Assign / move existing staff |
+| **staff Raju exit** / **staff Raju left** / **exit staff Raju** | Mark staff exited |
 
-> **KYC note:** Staff without uploaded ID are shown as `⚠ KYC pending` in `show staff rooms`. Upload anytime by triggering a new `add staff` command or waiting for the bot to prompt.
+An active staff member with the same name is not added twice. When the last staff member leaves a room it flips back to a revenue room — keep that in mind for designated staff quarters.
 
 ---
 
@@ -574,13 +467,26 @@ Values: `single`, `double`, `triple`, `premium`.
 
 | Message | What it does |
 |---------|-------------|
-| **rules** | Show PG rules & regulations |
-| **house rules** | Same |
-| **what are the rules** | Same |
+| **rules** / **house rules** / **niyam batao** | Show PG rules & regulations |
 
 ---
 
-## TENANT COMMANDS (Self-Service)
+### CHIT REGISTER (Kiran + Prabhakaran phones only)
+
+| Message | What it does |
+|---------|-------------|
+| **chit summary** / **chit oct** / **chit boobalan** | Register (list + totals) |
+| **paid boobalan chit 5.5L on 11 sep** | Log a chit payment (add **loan** / **bank** if so) |
+| **chit 6 amount 5L** / **chit 6 date 10 sep** | Edit an entry |
+| **void chit 6** | Void (never deleted) |
+
+Anyone else (Lokesh, other owners) gets "didn't understand" — nothing about chits is shown.
+
+---
+
+## TENANT COMMANDS (Self-Service) — DISABLED
+
+> Tenants get **no reply** from the bot (rule: zero automated tenant comms). The table below is historical — none of it is answered today.
 
 | Message | What it does |
 |---------|-------------|
@@ -604,7 +510,9 @@ Values: `single`, `double`, `triple`, `premium`.
 
 ---
 
-## LEAD COMMANDS (Room Enquiry)
+## LEAD COMMANDS (Room Enquiry) — DISABLED
+
+> Leads / unknown numbers get **no reply** (handled manually). Historical only.
 
 | Message | What it does |
 |---------|-------------|
@@ -616,7 +524,9 @@ Values: `single`, `double`, `triple`, `premium`.
 
 ---
 
-## CORRECTIONS (During Payment Confirmation)
+## CORRECTIONS (During Payment Confirmation) — app only
+
+> Payments are logged in the Kozzy app, so this flow no longer runs on WhatsApp. Historical only.
 
 When the bot asks "Confirm? Raj Kumar, Rs.15,000 UPI, March 2026. Reply Yes/No":
 
@@ -643,4 +553,4 @@ When the bot asks "Confirm? Raj Kumar, Rs.15,000 UPI, March 2026. Reply Yes/No":
 
 ---
 
-*Updated: 6 Apr 2026 | Cozeevo Co-living*
+*Updated: 11 Oct 2026 | Cozeevo Co-living*

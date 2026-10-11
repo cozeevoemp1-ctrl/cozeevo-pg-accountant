@@ -92,8 +92,10 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
     room_m = re.search(r"\b([A-Z]?\d{2,3}[A-Z]?(?:-[A-Z])?)\b", desc, re.I)
     room_from_desc = room_m.group(1).upper() if room_m else ""
 
-    if not name:
-        clean = re.sub(r"\b(change|update|set|modify|sharing|type|to|from|for|is|in|premium|single|double|triple|room|bed|configuration|occupancy|capacity)\b", "", desc, flags=re.I).strip()
+    if not name or re.search(r"\b(?:to|sharing|premium|single|double|triple)\b", name, re.I):
+        clean = re.sub(r"\b(change|update|set|modify|make|switch|now|sharing|type|to|from|for|of|is|in|premium|single|double|triple|room|bed|configuration|occupancy|capacity)\b", "", desc, flags=re.I).strip()
+        clean = re.sub(r"'s\b", "", clean)
+        clean = " ".join(clean.split())
         clean = re.sub(r"\b[A-Z]?\d{1,4}[A-Za-z]?\b", "", clean, flags=re.I).strip()
         name = clean
 
@@ -135,6 +137,20 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
         return f"*{tenant.name}* is already {new_sharing} sharing."
 
     room_label = f" (Room {room.room_number})" if room and hasattr(room, "room_number") else ""
+
+    # Premium = whole room. Same rule as the PWA PATCH: refuse while anyone else
+    # occupies (or is booked into) the room.
+    if new_sharing == "premium" and room is not None:
+        from src.services.room_occupancy import get_room_occupants
+        occ = await get_room_occupants(session, room)
+        others = [t.name for t, tc in occ.tenancies if tc.id != tenancy.id]
+        others += [tc.tenant.name for tc in occ.daywise
+                   if tc.id != tenancy.id and tc.tenant and tc.tenant.name not in others]
+        if others:
+            return (
+                f"Can't make *{tenant.name}* premium — Room {room.room_number} also has "
+                f"{', '.join(others)}. Premium (whole-room) needs the room free of other tenants."
+            )
 
     # Confirm
     action_data = {
@@ -229,8 +245,9 @@ async def update_rent(entities: dict, ctx: CallerContext, session: AsyncSession)
 
     # Fall back to name-based lookup
     if not name:
-        clean = re.sub(r"\b(change|update|set|modify|rent|amount|to|for|is|rs|rupees|per|month|day|\d+)\b", "", desc, flags=re.I).strip()
-        name = clean.strip(".,! ")
+        clean = re.sub(r"\b(change|update|set|modify|revise|rent|amount|to|for|of|is|should|be|rs|rupees|per|month|day|ka|ki|karo|kar|do|\d[\d,]*)\b", "", desc, flags=re.I)
+        clean = re.sub(r"'s\b", "", clean)
+        name = " ".join(clean.split()).strip(".,! ")
 
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] rent [amount]*"
@@ -283,9 +300,18 @@ async def update_phone(entities: dict, ctx: CallerContext, session: AsyncSession
     if not new_phone:
         return "What's the new phone number? Reply: *[Name] phone [number]*"
 
-    if not name:
-        clean = re.sub(r"\b(change|update|set|modify|phone|number|mobile|cell|to|for|is|\+?\d{10,13})\b", "", desc, flags=re.I).strip()
-        name = clean.strip(".,! ")
+    # Store the 10-digit number when given with a +91 / 91 prefix.
+    _digits = re.sub(r"\D", "", new_phone)
+    if len(_digits) == 12 and _digits.startswith("91"):
+        new_phone = _digits[2:]
+    elif len(_digits) != 10:
+        return f"*{new_phone}* doesn't look like a 10-digit mobile number. Reply: *[Name] phone [number]*"
+
+    if not name or re.search(r"\d", name):
+        clean = re.sub(r"\+?\d{10,13}", "", desc)
+        clean = re.sub(r"\b(change|update|set|modify|new|phone|number|no|mobile|cell|contact|to|for|of|is|as|ka|ki|ko|badal|badlo|do|karo)\b", "", clean, flags=re.I)
+        clean = re.sub(r"'s\b", "", clean)
+        name = " ".join(clean.split()).strip(".,!' ")
 
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] phone [number]*"
@@ -298,6 +324,8 @@ async def update_phone(entities: dict, ctx: CallerContext, session: AsyncSession
         return early
 
     old_phone = tenant.phone or "not set"
+    if re.sub(r"\D", "", str(old_phone))[-10:] == new_phone:
+        return f"*{tenant.name}*'s phone is already {new_phone}."
 
     action_data = {
         "tenant_id": tenant.id,
@@ -337,9 +365,10 @@ async def update_gender(entities: dict, ctx: CallerContext, session: AsyncSessio
     if not new_gender:
         return "Specify gender: *[Name] gender [male/female]*"
 
-    if not name:
-        clean = re.sub(r"\b(change|update|set|gender|to|for|is|male|female|woman|man|boy|girl)\b", "", desc, flags=re.I).strip()
-        name = clean.strip(".,! ")
+    if not name or re.search(r"\b(?:to|gender|male|female)\b", name, re.I):
+        clean = re.sub(r"\b(change|update|set|modify|gender|to|for|of|is|male|female|woman|man|boy|girl)\b", "", desc, flags=re.I)
+        clean = re.sub(r"'s\b", "", clean)
+        name = " ".join(clean.split()).strip(".,! ")
 
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] gender [male/female]*"
@@ -352,6 +381,8 @@ async def update_gender(entities: dict, ctx: CallerContext, session: AsyncSessio
         return early
 
     old_gender = tenant.gender or "not set"
+    if str(old_gender).lower() == new_gender:
+        return f"*{tenant.name}* is already {new_gender}."
 
     action_data = {
         "tenant_id": tenant.id,
@@ -557,7 +588,18 @@ async def _update_single_room(room_num: str, desc: str, ctx: CallerContext, sess
 
     # Maintenance mode
     if "maintenance" in desc_lower:
-        if any(w in desc_lower for w in ("under maintenance", "maintenance on", "close", "block")):
+        if any(w in desc_lower for w in ("under maintenance", "maintenance on", "close", "block")) \
+                and not any(w in desc_lower for w in ("maintenance done", "maintenance off", "unblock")):
+            # An inactive room drops out of every occupancy/bookability check —
+            # never do that with people (or bookings) still in it.
+            from src.services.room_occupancy import get_room_occupants
+            occ = await get_room_occupants(session, room)
+            names = [t.name for t, _tc in occ.tenancies]
+            if names:
+                return (
+                    f"Room *{room_num}* can't go under maintenance — occupied by {', '.join(names)}. "
+                    "Move or check them out first."
+                )
             old = room.active
             room.active = False
             _audit_room("active", old, False)
@@ -660,6 +702,14 @@ async def resolve_field_update(
                         changed_by=changed_by,
                         reason=action_data.get("reason", "manual update via bot"),
                     ))
+                # CLAUDE.md: agreed_rent / security_deposit change → first-month RS recalc
+                # (no-op unless the check-in month is the current or a future month).
+                # Monthly only: a day-stay's agreed_rent is the per-day rate, and its
+                # dues live in services/daily_dues.py, not RentSchedule.
+                from src.database.models import StayType as _ST
+                if field in ("agreed_rent", "security_deposit") and tenancy.stay_type == _ST.monthly:
+                    from src.services.rent_schedule import recalc_checkin_month_rs
+                    await recalc_checkin_month_rs(session, tenancy)
             else:
                 return "Record not found. Update failed."
 
@@ -744,7 +794,7 @@ async def add_staff(entities: dict, ctx: CallerContext, session: AsyncSession) -
 
     raw = (entities.get("_raw_message") or "").strip()
     # Strip the trigger prefix ("add staff ") and split on pipes
-    body = _re.sub(r"^(?:add|register|new)\s+staff\s+", "", raw, flags=_re.I).strip()
+    body = _re.sub(r"^\s*(?:add|register|new)\s+(?:a\s+)?staff(?:\s+member)?\b\s*", "", raw, flags=_re.I).strip()
     parts = [p.strip() for p in body.split("|")]
 
     if not parts or not parts[0]:
@@ -755,7 +805,15 @@ async def add_staff(entities: dict, ctx: CallerContext, session: AsyncSession) -
             "Fields after name are optional but KYC photo will be required."
         )
 
-    name = parts[0]
+    name = " ".join(w.capitalize() if w.islower() else w for w in parts[0].split())
+    # One person = one active staff row. A repeated "add staff" used to create a duplicate.
+    dup = next((s for s in (await session.execute(
+        select(Staff).where(Staff.active == True)
+    )).scalars().all() if s.name.strip().lower() == name.lower()), None)
+    if dup:
+        return (f"*{dup.name}* is already an active staff member"
+                + (f" ({dup.role})" if dup.role else "") + ". Nothing added.\n"
+                f"To move them: _staff {dup.name} room G05_ · if they left: _staff {dup.name} exit_")
     role = parts[1] if len(parts) > 1 else None
     salary = None
     dob = None
@@ -770,9 +828,11 @@ async def add_staff(entities: dict, ctx: CallerContext, session: AsyncSession) -
             pass
     if len(parts) > 3:
         raw_dob = parts[3].strip()
+        from datetime import datetime as _dt
         for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d"):
             try:
-                dob = _date(*[int(x) for x in _re.split(r"[-/]", raw_dob)])
+                # was _date(*split) → date(day, month, year) for dd-mm-yyyy → always failed
+                dob = _dt.strptime(raw_dob, fmt).date()
                 break
             except Exception:
                 pass
@@ -907,6 +967,7 @@ async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSe
 
 async def show_master_data(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """Live DB snapshot of master data — use to verify MASTER_DATA.md is current."""
+    from src.services.occupancy import get_bed_breakdown, revenue_room_filter
     # Staff rooms
     staff_room_rows = (await session.execute(
         select(Room.room_number, Property.name.label("bldg"), Room.max_occupancy)
@@ -923,7 +984,7 @@ async def show_master_data(entities: dict, ctx: CallerContext, session: AsyncSes
             func.sum(Room.max_occupancy).label("beds"),
         )
         .join(Property, Property.id == Room.property_id, isouter=True)
-        .where(Room.is_staff_room == False, Room.active == True)
+        .where(*revenue_room_filter())
         .group_by(Property.name)
         .order_by(Property.name)
     )).all()
@@ -942,6 +1003,11 @@ async def show_master_data(entities: dict, ctx: CallerContext, session: AsyncSes
         total_rooms += rooms or 0
         total_beds += beds or 0
     lines.append(f"  *Total: {total_rooms} rooms, {total_beds} beds*")
+    bb = await get_bed_breakdown(session)
+    lines.append(
+        f"  Now: {bb.checked_in} checked-in · {bb.noshow} no-show · {bb.vacant} vacant"
+        + (f" · ⚠ {bb.over} over capacity ({', '.join(bb.over_rooms)})" if bb.over else "")
+    )
 
     lines.append("\n_(Compare with MASTER_DATA.md — update if different.)_")
     return "\n".join(lines)
@@ -965,6 +1031,7 @@ async def assign_staff_to_room(entities: dict, ctx: CallerContext, session: Asyn
                 "_staff [name] room [num]_\n"
                 "e.g. _staff Rajesh room G05_")
 
+    room_num = room_num.upper()
     room = (await session.execute(
         select(Room).where(Room.room_number == room_num)
     )).scalar_one_or_none()
@@ -976,6 +1043,9 @@ async def assign_staff_to_room(entities: dict, ctx: CallerContext, session: Asyn
         select(Staff).where(Staff.active == True)
     )).scalars().all()
     exact_matches = [s for s in existing if s.name.lower() == name.lower()]
+    if not exact_matches:
+        # Same loose match as exit_staff: "Ravi" finds "Ravi Kumar"
+        exact_matches = [s for s in existing if name.lower() in s.name.lower()]
 
     if len(exact_matches) > 1:
         # Disambiguate — save pending and show numbered choices
@@ -1235,21 +1305,40 @@ async def query_rent_history(entities: dict, ctx: CallerContext, session: AsyncS
     desc = (entities.get("description") or entities.get("_raw_message") or "").strip()
     name = entities.get("name", "").strip()
 
-    if not name:
-        clean = re.sub(
-            r"\b(show|rent|history|revisions?|changes|for)\b",
-            "", desc, flags=re.I,
-        ).strip().strip(".,! ")
-        if len(clean) >= 2:
-            name = clean
+    room_m = re.search(r"\broom\s+([A-Za-z]?\d{1,4}[A-Za-z]?)\b", desc, re.I)
+    if room_m:
+        rows = await _find_active_tenants_by_room(room_m.group(1), session)
+        label = f"room {room_m.group(1)}"
+        if not rows:
+            return f"No active tenant in Room *{room_m.group(1)}*."
+    else:
+        if not name or re.search(r"\b(?:rent|history|of|for)\b", name, re.I):
+            clean = re.sub(
+                r"\b(show|check|view|get|what|was|rent|history|revisions?|changes?|before|previous|old|for|of)\b",
+                "", desc, flags=re.I,
+            )
+            clean = re.sub(r"'s\b", "", clean)
+            clean = " ".join(clean.split()).strip(".,!? ")
+            name = clean if len(clean) >= 2 else ""
+        if not name:
+            return "Which tenant? Reply: *rent history [name]*"
+        rows = await _find_active_tenants_by_name(name, session)
+        label = name
+        if not rows:
+            suggestions = await _find_similar_names(name, session)
+            return _format_no_match_message(name, suggestions)
 
-    if not name:
-        return "Which tenant? Reply: *rent history [name]*"
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(ctx.phone, "RENT_HISTORY_WHO", {}, choices, session)
+        return _format_choices_message(label, choices, "see rent history")
 
-    tenant, tenancy = await _find_active_tenant(name, session)
-    if not tenant:
-        return f"Couldn't find active tenant '{name}'."
+    tenant, tenancy, _room = rows[0]
+    return await rent_history_text(tenant, tenancy, session)
 
+
+async def rent_history_text(tenant: Tenant, tenancy: Tenancy, session: AsyncSession) -> str:
+    """Rent revision history for one tenancy (shared by direct + picked paths)."""
     revisions = (await session.execute(
         select(RentRevision)
         .where(RentRevision.tenancy_id == tenancy.id)
