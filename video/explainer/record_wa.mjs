@@ -8,13 +8,18 @@ import { startCapture } from './capture.mjs';
 const PHONE_MODE = process.argv.includes('--phone');
 
 const BOT = 'http://localhost:8100', PHONE = '917680814628'; // sandbox receptionist
-// Takes: --take checkin (first cut) | quick (story v3: queries + payment, needs --allow-finance)
+// Takes: --take checkin (first cut) | quick (v3: queries + payment, needs --allow-finance) | three (30 s cut)
 const TAKES = {
   checkin: [
     ['Arnav Kulkarni arrived', 1700],
     ['skip', 1200],
     ['yes', 1500],
     ['Pratik Rastogi paid 14000 cash', 1900],
+  ],
+  three: [
+    ['any male beds available?', 1600],
+    ['tap leaking in room 512', 1600],
+    ['who is in room 314?', 1800],
   ],
   quick: [
     ['any male beds available?', 2200],

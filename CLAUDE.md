@@ -197,6 +197,8 @@ Kiran's Excel (offline)
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
 | `src/utils/name_match.py` | `names_match()` — ID-OCR name vs typed name (spec 04). MIRRORED verbatim as `namesMatch()` in `static/onboarding.html` — change both or neither. Tests: `tests/test_name_match.py` |
 | `static/onboarding.html` | Tenant-facing onboarding form (served at `/onboard/{token}`) — Aadhaar front+back upload, OCR autofill, lock-in + special terms display, name/emergency-phone validation |
+| `web/app/auth/dev-login/route.ts` | DEV-ONLY demo login: 404 unless `next dev` + `DEV_DEMO_LOGIN=1` + local secret (`web/.env.development.local`). Lets the real PWA run against the sandbox API (`video/explainer/start_demo_api.sh`). Never set those vars in prod |
+| `video/kozzy-video/` | Remotion portfolio explainer (30 s). `src/timeline.json` drives scenes + generated soundtrack; regeneration steps in its README. Recorders + demo data seed in `video/explainer/` |
 | `web/middleware.ts` | Next.js auth gate — unauthenticated → /login; staff on /finance/** → /; 3s timeout fail-open; /auth/** and /mockups/** always allowed (no login) |
 | `mockups/` | Sales-demo mockups (static HTML, dummy data, no backend) — source of truth to edit/reskin per client. See `mockups/README.md`. Deployed copy in `web/public/mockups/` (kept in sync manually), live at `app.getkozzy.com/mockups/<file>.html` with no login required |
 | `web/app/login/page.tsx` | PWA login — email+password sign-in + "Forgot password?" reset flow |
@@ -269,11 +271,19 @@ WHATSAPP_TOKEN=...
 TEST_MODE=1   # enables /api/test/clear-pending endpoint
 ```
 
-## Admins
-- Kiran (+917845952289)
-- Partner (+917358341775)
-- Prabhakaran (9444296681)
-- Lakshmi Mam
+## Users & roles (verified in code 2026-10-11)
+| Person | WhatsApp bot (`role_service.py` allowlist) | PWA (`app_metadata.role`) |
+|---|---|---|
+| Kiran (+917845952289) | admin | admin |
+| Lakshmi (+917358341775, "Partner") | owner | admin |
+| Prabhakaran (9444296681) | owner | admin |
+| Lokesh (+917680814628) | receptionist | staff |
+- WhatsApp: admin/owner/receptionist get the same operational handler; finance intents are blocked
+  for everyone ("use the Kozzy app"); chit register = Kiran + Prabhakaran phones only. Every other
+  number (tenants, leads) is `blocked` → silence.
+- PWA: admin = everything incl. /finance + /collection; staff = daily ops (payments, check-in/out,
+  bookings, tenant edits), no finance, no blacklist, no tenant delete. Tenants have no app login —
+  they only use the public `/join/{token}` onboarding form.
 
 ## End of day checklist (COMPULSORY — do this before closing EVERY session)
 Before closing any session, complete ALL of these:

@@ -1,5 +1,34 @@
 # Changelog
 
+## Session AX — 2026-10-11 — Floor filter, explainer video, demo tooling; AW + AX deployed
+
+- **Deployed to prod** (`9391a97`, verified via `/healthz`). The merge also shipped all of
+  **Session AW** (bot audit fixes), which had been held on `development` — including its
+  removal of the tenant checkout-confirmation + arrival-welcome messages. Kiran chose to keep
+  AW live and restore those two sends; the restore is in the working tree of
+  `owner_handler.py` + `resolvers/onboarding.py` but **not committed/tested/deployed** — the
+  Claude Code safety check blocks automated work that re-enables tenant messages (see pending).
+- **Bot — floor filter**: "empty beds on 3rd floor", "how many beds free in HULK floor 2",
+  "vacant beds second floor THOR", "ground floor" now filter by floor (+ building). New rule
+  before ROOM_LAYOUT (its "hulk floor" alternative swallowed these). `occupancy.floor_of()` is
+  the single floor rule (room-number based; `rooms.floor` is mostly NULL);
+  `BedBreakdown.subset(building, floor)`. Tests: sandbox Q-166..169, `tests/test_occupancy_floor.py`.
+  Full sandbox regression 100% cold + repeat (1,031 cases + 35 webhook).
+- **Dev-only demo login** `web/app/auth/dev-login` — 404 unless `next dev` + `DEV_DEMO_LOGIN=1`
+  + local secret; lets the real PWA run against the sandbox API (no backend change).
+- **Sandbox**: opt-in `--allow-finance` / `--fake-sheets` (off by default; gate suite still
+  tests the finance block). `video/explainer/seed_demo.py` = realistic demo month
+  (Jul–Sep paid, Oct ~80%, deposits paid).
+- **Explainer video** (`video/kozzy-video`, Remotion, Midnight look): 30 s portfolio cut —
+  intro stats, 01 web app (real recording: collect rent), 02 WhatsApp assistant (real bot: 3
+  everyday questions), CTA close. Code-generated launch soundtrack from the shared
+  `timeline.json`. Close is switchable (`--props='{"close":"ai"}'`).
+- **Local venv**: `site-packages/sqlalchemy/` had been deleted (dist-info intact) — reinstalled
+  2.0.48. Local only; VPS unaffected.
+- Found, not fixed: PWA dues list shows "₹16,500.0" (stray `.0`); bot payment confirmation
+  starts with a stray "Oct 2026: Rs.20,000 --" line. WhatsApp roles: Lakshmi + Prabhakaran are
+  `owner`, not `admin` (CLAUDE.md corrected).
+
 ## Session AW — 2026-10-11 — WhatsApp bot end-to-end audit + fixes, sandbox test suite
 
 - **Sandbox E2E suite** (`tests/sandbox/`): real app against local Postgres with synthetic

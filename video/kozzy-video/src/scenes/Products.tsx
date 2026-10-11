@@ -12,13 +12,13 @@ export const App: React.FC = () => (
     ]} />
 );
 
-// WhatsApp take trimmed before the payment message: production keeps payments in the app.
+// Three everyday questions to the real bot (test data). Payments stay in the app in production.
 export const Bot: React.FC = () => (
-  <ProductShot n="02" name="WhatsApp assistant" line="For staff on the go: ask in plain words."
-    clip="wa_quick.mp4" clipFrom={0.3} clipTo={8.5} aspect={1688 / 780} color={M.pink}
+  <ProductShot n="02" name="WhatsApp assistant" line="For staff on the go: just ask in plain words."
+    clip="wa_three.mp4" clipFrom={0.3} clipTo={11.6} aspect={1688 / 780} color={M.pink}
     pins={[
-      { at: 0.9, y: 0.965, label: "Staff type a question" },
-      { at: 2.7, y: 0.25, label: "Instant answer from live data" },
-      { at: 5.6, y: 0.47, label: "Ask the next one" },
+      { at: 2.7, y: 0.25, label: "Free rooms, instantly" },
+      { at: 6.1, y: 0.7, label: "Repair ticket logged" },
+      { at: 9.4, y: 0.84, label: "Who lives where" },
     ]} />
 );

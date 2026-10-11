@@ -2,9 +2,21 @@
   "bpm": 120,
   "fps": 30,
   "scenes": [
-    { "id": "intro", "bars": 2 },
-    { "id": "app", "bars": 5 },
-    { "id": "bot", "bars": 6 },
-    { "id": "result", "bars": 2 }
+    {
+      "id": "intro",
+      "bars": 2
+    },
+    {
+      "id": "app",
+      "bars": 4
+    },
+    {
+      "id": "bot",
+      "bars": 6
+    },
+    {
+      "id": "result",
+      "bars": 3
+    }
   ]
 }
