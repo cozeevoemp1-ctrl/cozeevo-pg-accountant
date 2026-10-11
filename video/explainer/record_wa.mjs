@@ -4,6 +4,9 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import { startCapture } from './capture.mjs';
 
+// node record_wa.mjs [--phone]  -> out/wa_demo.mp4 (desktop) or out/wa_phone.mp4 (390x844 phone, 2x)
+const PHONE_MODE = process.argv.includes('--phone');
+
 const BOT = 'http://localhost:8100', PHONE = '917680814628'; // sandbox receptionist
 const SCRIPT = [
   ['Arnav Kulkarni arrived', 1700],
@@ -14,8 +17,8 @@ const SCRIPT = [
 
 await fetch(BOT + '/api/test/clear-pending', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: PHONE }) });
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1800, height: 1200 }, deviceScaleFactor: 1 });
-await page.route('http://demo.local/wa.html', r => r.fulfill({ body: fs.readFileSync('demo/wa.html'), contentType: 'text/html; charset=utf-8' }));
+const page = await browser.newPage({ viewport: PHONE_MODE ? { width: 780, height: 1688 } : { width: 1800, height: 1200 }, deviceScaleFactor: 1 });
+await page.route('http://demo.local/wa.html*', r => r.fulfill({ body: fs.readFileSync('demo/wa.html'), contentType: 'text/html; charset=utf-8' }));
 let n = 0;
 await page.route('http://demo.local/bot', async r => {
   const { message } = JSON.parse(r.request().postData());
@@ -25,7 +28,7 @@ await page.route('http://demo.local/bot', async r => {
   console.log(`>>> ${message} [${d.intent}]\n${d.reply}\n`);
   await r.fulfill({ body: JSON.stringify(d), contentType: 'application/json' });
 });
-await page.goto('http://demo.local/wa.html');
+await page.goto('http://demo.local/wa.html' + (PHONE_MODE ? '?m=1&z=2' : '?z=1.5'));
 await page.waitForTimeout(400);
 const stop = await startCapture(page, 'out/wa_frames');
 await page.waitForTimeout(700);
@@ -38,5 +41,5 @@ for (const [msg, hold] of SCRIPT) {
   await page.waitForFunction(b => window.__lastReply !== b, before, { timeout: 60000 });
   await page.waitForTimeout(hold);
 }
-await stop('out/wa_demo.mp4');
+await stop(PHONE_MODE ? 'out/wa_phone.mp4' : 'out/wa_demo.mp4');
 await browser.close();

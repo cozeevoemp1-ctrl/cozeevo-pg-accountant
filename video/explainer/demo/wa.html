@@ -3,9 +3,8 @@
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font: 22px/1.38 "Segoe UI", system-ui, sans-serif; color: #111b21; background: #d1d7db; }
-  body { zoom: 1.5; }
-  .app { display: flex; height: calc(100vh / 1.5); background: #fff; }
-  .side { display: none; width: 360px; border-right: 1px solid #e9edef; display: flex; flex-direction: column; }
+  .app { display: flex; height: calc(100vh / var(--z, 1)); background: #fff; }
+  .side { width: 360px; border-right: 1px solid #e9edef; display: flex; flex-direction: column; }
   .side header { height: 60px; background: #f0f2f5; display: flex; align-items: center; padding: 0 16px; font-weight: 600; font-size: 17px; }
   .search { margin: 8px 12px; background: #f0f2f5; border-radius: 8px; height: 36px; padding: 0 14px; display: flex; align-items: center; color: #8696a0; font-size: 14px; }
   .item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #f0f2f5; }
@@ -32,6 +31,15 @@
   #box { flex: 1; height: 58px; border-radius: 8px; border: 0; padding: 0 14px; font: inherit; font-size: 22px; outline: none; background: #fff; }
   .send { width: 58px; height: 58px; border-radius: 50%; background: #EF1F9C; display: grid; place-items: center; }
   .send::after { content: ''; border-left: 13px solid #fff; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 4px; }
+  /* phone layout: wa.html?m=1 (record at 390x844 css, zoom via ?z) */
+  body.m .side { display: none; }
+  body.m { font-size: 17px; }
+  body.m .main header { height: 64px; padding: 0 12px; }
+  body.m .main header .av { width: 40px; height: 40px; font-size: 15px; }
+  body.m .main header .n { font-size: 18px; } body.m .main header .s { font-size: 13px; } body.m .tag { font-size: 12px; }
+  body.m #log { padding: 14px 10px 10px; }
+  body.m .b { max-width: 86%; padding: 7px 10px 20px; } body.m .b .t { font-size: 11px; }
+  body.m footer { height: 64px; padding: 0 10px; } body.m #box { height: 44px; font-size: 17px; } body.m .send { width: 44px; height: 44px; }
 </style></head>
 <body>
 <div class="app">
@@ -47,6 +55,9 @@
   </section>
 </div>
 <script>
+const Q = new URLSearchParams(location.search), Z = +(Q.get("z") || 1.5);
+document.body.style.zoom = Z; document.documentElement.style.setProperty("--z", Z);
+if (Q.get("m")) document.body.classList.add("m");
 // Each sent message goes to the REAL bot code (local sandbox, synthetic data) via /bot.
 const log = document.getElementById('log'), box = document.getElementById('box');
 let clock = 10 * 60 + 2;
