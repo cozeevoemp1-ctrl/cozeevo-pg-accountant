@@ -8,12 +8,23 @@ import { startCapture } from './capture.mjs';
 const PHONE_MODE = process.argv.includes('--phone');
 
 const BOT = 'http://localhost:8100', PHONE = '917680814628'; // sandbox receptionist
-const SCRIPT = [
-  ['Arnav Kulkarni arrived', 1700],
-  ['skip', 1200],
-  ['yes', 1500],
-  ['Pratik Rastogi paid 14000 cash', 1900],
-];
+// Takes: --take checkin (first cut) | quick (story v3: queries + payment, needs --allow-finance)
+const TAKES = {
+  checkin: [
+    ['Arnav Kulkarni arrived', 1700],
+    ['skip', 1200],
+    ['yes', 1500],
+    ['Pratik Rastogi paid 14000 cash', 1900],
+  ],
+  quick: [
+    ['any male beds available?', 2200],
+    ['how many beds free in HULK floor 2', 2200],
+    ['Vinay Shetty paid 20000 upi', 1600],
+    ['yes', 2200],
+  ],
+};
+const TAKE = process.argv.includes('--take') ? process.argv[process.argv.indexOf('--take') + 1] : 'checkin';
+const SCRIPT = TAKES[TAKE];
 
 await fetch(BOT + '/api/test/clear-pending', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: PHONE }) });
 const browser = await chromium.launch();
@@ -41,5 +52,5 @@ for (const [msg, hold] of SCRIPT) {
   await page.waitForFunction(b => window.__lastReply !== b, before, { timeout: 60000 });
   await page.waitForTimeout(hold);
 }
-await stop(PHONE_MODE ? 'out/wa_phone.mp4' : 'out/wa_demo.mp4');
+await stop(PHONE_MODE ? (TAKE === 'checkin' ? 'out/wa_phone.mp4' : `out/wa_${TAKE}.mp4`) : 'out/wa_demo.mp4');
 await browser.close();

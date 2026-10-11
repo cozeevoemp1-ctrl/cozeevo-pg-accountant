@@ -120,9 +120,48 @@ def install_guards() -> None:
         pass
 
 
+def allow_finance() -> None:
+    """Opt-in (--allow-finance), sandbox only: staff FINANCIAL_INTENTS go to account_handler
+    instead of the production WhatsApp finance block. For recording demo footage; the
+    production gatekeeper is untouched and gate.json keeps testing the block (flag off)."""
+    import src.whatsapp.gatekeeper as gk
+    import src.whatsapp.chat_api as ca
+    from src.whatsapp.handlers.account_handler import FINANCIAL_INTENTS, handle_account
+    orig = gk.route
+
+    async def route(intent, entities, ctx, message, session):
+        if intent in FINANCIAL_INTENTS and ctx.role in ("admin", "owner", "receptionist"):
+            entities.setdefault("_raw_message", message)
+            return await handle_account(intent, entities, ctx, session)
+        return await orig(intent, entities, ctx, message, session)
+
+    gk.route = ca.route = route  # chat_api imported `route` by name
+    print("[sandbox] finance intents ENABLED for staff (demo only)", flush=True)
+
+
+def fake_sheets() -> None:
+    """Opt-in (--fake-sheets), sandbox only: Google Sheets write-backs (async update_*/add_*
+    in src.integrations.gsheets) report success instead of failing on the blocked network,
+    so demo replies match production ("Sheet update failed" would otherwise be appended)."""
+    import inspect
+    import src.integrations.gsheets as gs
+
+    async def _ok(*a, **kw):
+        return {"success": True}
+
+    n = 0
+    for name, fn in list(vars(gs).items()):
+        if inspect.iscoroutinefunction(fn) and name.startswith(("update_", "add_", "record_", "append_")):
+            setattr(gs, name, _ok)
+            n += 1
+    print(f"[sandbox] {n} Sheets write-backs faked as success (demo only)", flush=True)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8100)
+    ap.add_argument("--allow-finance", action="store_true", help="demo only: lift the WhatsApp finance block")
+    ap.add_argument("--fake-sheets", action="store_true", help="demo only: Sheets write-backs report success")
     args = ap.parse_args()
 
     os.environ.setdefault("DATABASE_URL", SANDBOX_DB)
@@ -134,6 +173,10 @@ def main() -> None:
 
     install_guards()
     os.chdir(ROOT)
+    if args.allow_finance:
+        allow_finance()
+    if args.fake_sheets:
+        fake_sheets()
     import uvicorn
     print(f"[sandbox] DB={urlparse(db).hostname}:{urlparse(db).port} port={args.port} "
           f"outbound -> {OUTBOUND_LOG}", flush=True)

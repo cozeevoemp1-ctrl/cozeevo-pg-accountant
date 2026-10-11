@@ -146,6 +146,11 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:pending refunds?|refunds? due|who needs? refund|deposits? to return|list (?:all )?refunds?|show refunds?|refund history|refund summary|refund status|refunds? this|refunds? for\s+\w+|all refunds?|\w+\s+refunds?)", re.I), "QUERY_REFUNDS", 0.91),
     # Refund / deposit return (generic — matches after QUERY_REFUNDS above)
     (re.compile(r"(?:refund|return deposit|give back deposit|deposit back|repay deposit|disburse deposit|pay\s*back\s+deposit|deposit\s+wapas|wapas\s+karo\b)", re.I), "ADD_REFUND", 0.92),
+    # Vacancy on a floor — "empty beds on 3rd floor", "how many beds free in HULK floor 2".
+    # MUST precede ROOM_LAYOUT, whose "hulk floor" alternative otherwise swallows these.
+    # Excludes tonight/today/day-stay so DAYSTAY_AVAILABILITY keeps those.
+    (re.compile(r"^(?!.*\b(?:tonight|today|day[-\s]*stay)\b)(?=.*\b(?:vacant|vacnt|empty|free|available|unoccupied|vacancy|khali)\b)"
+                r".*(?:\b(?:\d|first|second|third|fourth|fifth|sixth|ground)(?:st|nd|rd|th)?\s*floor\b|\bfloor\s*\d\b|\bgf\b)", re.I), "QUERY_VACANT_ROOMS", 0.95),
     # Floor plan / room layout — "thor floor plan", "hulk layout", "room diagram"
     (re.compile(r"(?:floor\s*plan|room\s*layout|room\s*diagram|block\s*layout|layout\s*of\s*(?:thor|hulk)|(?:thor|hulk)\s*(?:layout|diagram|floors?|rooms?|beds?)|beds?\s*per\s*floor|rooms?\s*per\s*floor|show\s*(?:me\s*)?(?:all\s*)?(?:thor|hulk|block)\s*rooms?)", re.I), "ROOM_LAYOUT", 0.95),
     # Unhandled requests — admin only, "show unhandled", "what couldn't you handle"

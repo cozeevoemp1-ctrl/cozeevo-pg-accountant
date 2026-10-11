@@ -1,16 +1,13 @@
 import React from "react";
-import { Video } from "@remotion/media";
-import { staticFile } from "remotion";
 
-// Machined phone: outer shell + inner screen (concentric radii). Screen plays a recorded clip.
+// Machined phone: outer shell + inner screen (concentric radii). Screen content is passed as children.
 export const Phone: React.FC<{
-  src: string;
   width: number;
-  aspect: number; // clip height / width
-  trimBefore?: number; // frames into the clip
+  aspect: number; // screen height / width
   shell?: string;
   style?: React.CSSProperties;
-}> = ({ src, width, aspect, trimBefore = 0, shell = "#0E0E12", style }) => {
+  children: React.ReactNode;
+}> = ({ width, aspect, shell = "#1A1A22", style, children }) => {
   const pad = Math.round(width * 0.035);
   const r = Math.round(width * 0.15);
   return (
@@ -20,13 +17,15 @@ export const Phone: React.FC<{
         padding: pad,
         borderRadius: r,
         background: shell,
-        boxShadow: "0 0 0 1.5px rgba(255,255,255,0.08) inset, 0 40px 80px -20px rgba(0,0,0,0.35), 0 12px 24px -8px rgba(0,0,0,0.25)",
+        boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.10), 0 40px 90px -20px rgba(0,0,0,0.6)",
         ...style,
       }}
     >
-      <div style={{ width, height: width * aspect, borderRadius: r - pad, overflow: "hidden", background: "#fff" }}>
-        <Video src={staticFile(src)} trimBefore={trimBefore} muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "relative", width, height: width * aspect, borderRadius: r - pad, overflow: "hidden", background: "#fff" }}>
+        {children}
       </div>
     </div>
   );
 };
+
+export const fill: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };

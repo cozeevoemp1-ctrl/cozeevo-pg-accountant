@@ -6830,9 +6830,19 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     if gender_filter:
         return await _query_beds_by_gender(gender_filter, building_filter, session)
 
+    # Floor filter — "3rd floor", "floor 2", "second floor", "ground floor"/"gf"
+    _FLOOR_WORDS = {"ground": "G", "first": "1", "second": "2", "third": "3",
+                    "fourth": "4", "fifth": "5", "sixth": "6"}
+    floor_filter = None
+    _fm = re.search(r"\b(ground|first|second|third|fourth|fifth|sixth|\d)(?:st|nd|rd|th)?\s*floor\b"
+                    r"|\bfloor\s*(\d)\b|\b(gf)\b", desc)
+    if _fm:
+        _tok = _fm.group(1) or _fm.group(2) or "ground"
+        floor_filter = _FLOOR_WORDS.get(_tok, _tok)
+
     # ── Bed state per room — canonical (src/services/occupancy.py) ────────
-    from src.services.occupancy import get_bed_breakdown
-    bb = (await get_bed_breakdown(session)).subset(building_filter)
+    from src.services.occupancy import get_bed_breakdown, floor_of
+    bb = (await get_bed_breakdown(session)).subset(building_filter, floor_filter)
     room_objs = {r.id: (r, pn) for r, pn in (await session.execute(
         select(Room, Property.name)
         .join(Property, Property.id == Room.property_id)
@@ -6851,14 +6861,15 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     total_empty = bb.vacant
     total_occupied = bb.checked_in
 
-    bld = f" in *{building_filter}*" if building_filter else ""
+    _floor_txt = None if not floor_filter else ("ground floor" if floor_filter == "G" else f"floor {floor_filter}")
+    _scope = " ".join(x for x in (building_filter, _floor_txt) if x)
+    bld = f" in *{_scope}*" if _scope else ""
     if not rooms_with_empty:
         return f"All {total_beds} beds{bld} are occupied. No empty beds."
 
     _ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡", "triple": "🟠", "premium": "⭐"}
 
-    def _floor_label(rn: str) -> str:
-        return "G" if rn.upper().startswith("G") else rn[0]
+    _floor_label = floor_of
 
     # Group: fully vacant vs partially occupied
     fully_vacant = [(r, p, o, f) for r, p, o, f in rooms_with_empty if o == 0]

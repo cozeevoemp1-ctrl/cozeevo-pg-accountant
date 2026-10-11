@@ -1,0 +1,15 @@
+{
+  "bpm": 120,
+  "fps": 30,
+  "scenes": [
+    { "id": "hook", "bars": 2 },
+    { "id": "why", "bars": 3 },
+    { "id": "how", "bars": 2 },
+    { "id": "app_collect", "bars": 6 },
+    { "id": "app_vacant", "bars": 3 },
+    { "id": "whatsapp", "bars": 6 },
+    { "id": "same_record", "bars": 2 },
+    { "id": "guardrail", "bars": 2 },
+    { "id": "result", "bars": 3 }
+  ]
+}

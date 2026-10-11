@@ -1417,6 +1417,84 @@
           ]
         }
       ]
+    },
+    {
+      "id": "Q-166",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "floor filter, ordinal",
+      "turns": [
+        {
+          "msg": "how many beds are empty on 3rd floor",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds",
+            "floor 3",
+            "F3"
+          ],
+          "expect_not_contains": [
+            "F1 ",
+            "F2 ",
+            "F4 ",
+            "GF "
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-167",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "building + floor (was ROOM_LAYOUT)",
+      "turns": [
+        {
+          "msg": "how many beds free in HULK floor 2",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds",
+            "HULK floor 2"
+          ],
+          "expect_not_contains": [
+            "THOR —",
+            "F3 "
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-168",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "floor word + building",
+      "turns": [
+        {
+          "msg": "vacant beds second floor THOR",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds",
+            "THOR floor 2"
+          ],
+          "expect_not_contains": [
+            "HULK —"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q-169",
+      "intent": "QUERY_VACANT_ROOMS",
+      "desc": "ground floor",
+      "turns": [
+        {
+          "msg": "empty beds on ground floor",
+          "expect_intent": "QUERY_VACANT_ROOMS",
+          "expect_contains": [
+            "Empty Beds",
+            "ground floor",
+            "GF"
+          ],
+          "expect_not_contains": [
+            "F1 "
+          ]
+        }
+      ]
     }
   ]
 }

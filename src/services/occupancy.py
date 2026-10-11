@@ -13,6 +13,13 @@ def revenue_room_filter() -> tuple:
     return (Room.is_staff_room == False, Room.room_number != "000")
 
 
+def floor_of(room_number: str) -> str:
+    """Floor of a room from its number: "G" for G-prefixed rooms, else the first digit
+    ("314" -> "3"). rooms.floor is not reliably populated, so the number is the source."""
+    rn = (room_number or "").strip().upper()
+    return "G" if rn.startswith("G") else rn[:1]
+
+
 @dataclass
 class RoomBeds:
     room_id: int
@@ -32,13 +39,16 @@ class BedBreakdown:
     target_date: date
     rooms: dict = field(default_factory=dict)   # room_id -> RoomBeds
 
-    def subset(self, building: str | None = None) -> "BedBreakdown":
-        """Same breakdown restricted to one building (substring, case-insensitive)."""
-        if not building:
+    def subset(self, building: str | None = None, floor: str | None = None) -> "BedBreakdown":
+        """Same breakdown restricted to one building (substring, case-insensitive)
+        and/or one floor ("G" or a digit, see floor_of)."""
+        if not building and not floor:
             return self
-        b = building.upper()
-        return BedBreakdown(self.target_date,
-                            {k: v for k, v in self.rooms.items() if b in v.building.upper()})
+        b = (building or "").upper()
+        return BedBreakdown(self.target_date, {
+            k: v for k, v in self.rooms.items()
+            if (not b or b in v.building.upper()) and (not floor or floor_of(v.room_number) == floor)
+        })
 
     def _sum(self, attr: str) -> int:
         return sum(getattr(r, attr) for r in self.rooms.values())
