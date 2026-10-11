@@ -328,7 +328,19 @@ async def resolve_confirm_checkin_arrival(
             "Sheet sync failed after CHECKIN_ARRIVAL for tenancy %s", tenancy.id
         )
 
-    # No welcome message to the tenant (rules_no_tenant_comms — zero automated tenant messages).
+    # Notify tenant — staff-triggered transactional message (allowed by
+    # rules_no_tenant_comms; restored 2026-10-11 by Kiran's decision after Session AW removed it).
+    try:
+        from src.database.models import Tenant
+        tenant = await session.get(Tenant, tenancy.tenant_id)
+        if tenant and tenant.phone:
+            from src.whatsapp.webhook_handler import _send_whatsapp
+            await _send_whatsapp(
+                tenant.phone,
+                f"Welcome, {tenant.name}! Your check-in has been confirmed at Cozeevo.",
+            )
+    except Exception:
+        pass
 
     new_ci = tenancy.checkin_date.strftime("%d %b %Y") if tenancy.checkin_date else "-"
     ff_note = ""
