@@ -1,0 +1,67 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Storyboard</title>
+<style>html,body{margin:0;background:#fff}canvas{display:block}</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script src="lib.js"></script>
+<script src="scenes.js"></script>
+<script>
+// Storyboard sheet: thumbnails are the real scene renderer at each shot's key moment.
+const ctx = document.getElementById('c').getContext('2d');
+const BARS = DURATION / BAR;
+const CHORDS = [...Array(BARS - 3)].map((_, i) => ['Am','F','C','G'][i % 4]).concat(['F','G','C']);
+const M = 40, GAP = 20, COLS = 5, TW = (W - M * 2 - GAP * (COLS - 1)) / COLS, TH = TW * 9 / 16;
+
+function wrap(str, x, y, maxW, size, lh, o = {}) {
+  ctx.save(); ctx.font = `${o.weight || 400} ${size}px ${FONT}`;
+  let line = '', yy = y;
+  for (const word of str.split(' ')) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxW && line) { txt(ctx, line, x, yy, { size, ...o }); line = word; yy += lh; }
+    else line = test;
+  }
+  txt(ctx, line, x, yy, { size, ...o });
+  ctx.restore();
+  return yy + lh;
+}
+const fmt = s => `0:${String(s).padStart(2, '0')}`;
+
+async function draw() {
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  txt(ctx, 'Explainer · Storyboard', M, 72, { size: 40, weight: 700 });
+  txt(ctx, `${DURATION} s  ·  16:9  ·  1920×1080  ·  30 fps  ·  120 BPM  ·  ${BARS} bars (1 bar = 2 s)  ·  on-screen text, no voice-over`,
+      W - M, 72, { size: 21, color: C.sub, align: 'right' });
+
+  // beat timeline
+  const ty = 104, tw = W - M * 2, bw = tw / BARS;
+  SCENES.forEach((s, i) => {
+    const x = M + (s.start / 2) * bw, w = ((s.end - s.start) / 2) * bw;
+    rr(ctx, x + 2, ty, w - 4, 40, 8); ctx.fillStyle = i % 2 ? C.blueSoft : C.pinkSoft; ctx.fill();
+    txt(ctx, w > 150 ? `${s.id}  ${s.name}` : `${s.id}`, x + 12, ty + 27, { size: 15, weight: 600, color: i % 2 ? '#0A7FAE' : '#B8137A' });
+  });
+  for (let b = 0; b < BARS; b++) {
+    const x = M + b * bw;
+    txt(ctx, `${b + 1}`, x + 6, ty + 66, { size: 14, weight: 600, color: C.faint });
+    txt(ctx, CHORDS[b], x + 30, ty + 66, { size: 14, color: C.faint });
+    for (let k = 0; k < 4; k++) { ctx.fillStyle = k ? C.line : C.faint; ctx.fillRect(x + k * bw / 4, ty + 46, 2, k ? 6 : 10); }
+  }
+
+  // panels
+  const off = document.createElement('canvas'); off.width = W; off.height = H;
+  const octx = off.getContext('2d');
+  for (const [i, s] of SCENES.entries()) {
+    const col = i % COLS, row = Math.floor(i / COLS);
+    const x = M + col * (TW + GAP), y = 196 + row * 440;
+    await prepare(s.thumbAt); render(octx, s.thumbAt);
+    ctx.save(); rr(ctx, x, y, TW, TH, 12); ctx.clip(); ctx.drawImage(off, x, y, TW, TH); ctx.restore();
+    rr(ctx, x, y, TW, TH, 12); ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.stroke();
+    let yy = y + TH + 30;
+    txt(ctx, `${s.id}`, x, yy, { size: 20, weight: 700, color: C.pink });
+    txt(ctx, `${fmt(s.start)}–${fmt(s.end)}   ${s.end - s.start > 2 ? 'bars ' + (s.start / 2 + 1) + '–' + s.end / 2 : 'bar ' + s.end / 2}`, x + 26, yy, { size: 17, weight: 600, color: C.sub });
+    yy = wrap('“' + s.caption.replace(/\*/g, '').replace(/\n/g, ' ') + '”', x, yy + 26, TW, 17, 22, { weight: 600 });
+    yy = wrap('Motion: ' + s.motion, x, yy + 4, TW, 14, 19, { color: C.sub });
+    wrap('Sound: ' + s.sound, x, yy + 2, TW, 14, 19, { color: C.sub });
+  }
+  window.__done = true;
+}
+document.fonts.ready.then(loadMedia).then(draw).catch(e => { console.error(e); throw e; });
+</script></body></html>

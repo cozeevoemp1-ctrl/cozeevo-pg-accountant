@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
+await p.route('http://demo.local/kozzy.html', r => r.fulfill({ body: fs.readFileSync('../../mockups/kozzy.html'), contentType: 'text/html; charset=utf-8' }));
+await p.goto('http://demo.local/kozzy.html'); await p.waitForTimeout(500);
+await p.locator('.tab', { hasText: 'Board' }).click(); await p.waitForTimeout(500);
+console.log(await p.evaluate(() => [...document.querySelectorAll('.page.active *')].filter(e => e.children.length <= 4 && /^(G?\d{2,3})$/.test((e.firstElementChild?.innerText || e.innerText || '').trim().split('\n')[0]) && e.getBoundingClientRect().width > 30 && e.getBoundingClientRect().width < 120).slice(0, 14).map(e => { const r = e.getBoundingClientRect(); return `${e.tagName}.${e.className} "${e.innerText.replace(/\s+/g,' ')}" ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`; }).join('\n')));
+await p.screenshot({ path: 'out/mock_board.png', clip: { x: 759, y: 76, width: 402, height: 900 } });
+await b.close();
