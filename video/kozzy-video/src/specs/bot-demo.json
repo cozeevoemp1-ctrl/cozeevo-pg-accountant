@@ -1,0 +1,28 @@
+{
+  "id": "BotDemo",
+  "bpm": 120,
+  "fps": 30,
+  "music": "music/bot_demo.wav",
+  "scenes": [
+    { "type": "hook", "bars": 2, "eyebrow": "Product demo", "title": "WhatsApp AI assistant", "sub": "for the staff of a 300-bed co-living business" },
+    { "type": "feature", "bars": 8, "n": "", "eyebrow": "Demo environment · test data", "name": "Just send a message", "line": "Check-ins, payments and repairs, straight from WhatsApp.",
+      "clip": "clips/wa_e2e.mp4", "clipFrom": 0.3, "clipTo": 17.5, "aspect": 2.1641, "color": "pink",
+      "pins": [
+        { "at": 2.6, "y": 0.3, "label": "Check in a new tenant" },
+        { "at": 5.0, "y": 0.6, "label": "Confirms before saving" },
+        { "at": 10.4, "y": 0.62, "label": "Log a rent payment" },
+        { "at": 15.3, "y": 0.8, "label": "Report a repair" }
+      ] },
+    { "type": "stack", "bars": 2, "title": "Rules first. AI when it helps.",
+      "nodes": [
+        { "id": "wa", "label": "WhatsApp", "tech": "Meta Cloud API", "x": 0, "y": 1 },
+        { "id": "api", "label": "Backend", "tech": "Python · FastAPI", "x": 1, "y": 1 },
+        { "id": "ai", "label": "AI understanding", "tech": "Groq LLM · for unclear messages", "x": 1, "y": 0 },
+        { "id": "db", "label": "Database", "tech": "PostgreSQL · Supabase", "x": 2, "y": 1 },
+        { "id": "app", "label": "Web app", "tech": "same data for managers", "x": 2, "y": 0 }
+      ],
+      "edges": [ ["wa", "api"], ["api", "ai"], ["api", "db"], ["db", "app"] ] },
+    { "type": "cta", "bars": 3, "q": "Want something like this for your business?",
+      "a": "Let’s explore what AI can do for you.", "button": "Let’s talk →" }
+  ]
+}

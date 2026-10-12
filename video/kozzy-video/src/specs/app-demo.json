@@ -1,0 +1,31 @@
+{
+  "id": "AppDemo",
+  "bpm": 120,
+  "fps": 30,
+  "music": "music/app_demo.wav",
+  "scenes": [
+    { "type": "hook", "bars": 2, "eyebrow": "Product demo", "title": "Property operations web app", "sub": "for a 300-bed co-living business" },
+    { "type": "feature", "bars": 4, "n": "01", "eyebrow": "Feature 01", "name": "Collect rent", "line": "Find who owes, record cash or UPI in seconds.",
+      "clip": "clips/app_collect.mp4", "clipFrom": 0.8, "clipTo": 10.8, "aspect": 2.1674, "color": "blue",
+      "pins": [ { "at": 3.5, "y": 0.3, "label": "Record a payment" }, { "at": 9.4, "y": 0.12, "label": "Totals update instantly" } ] },
+    { "type": "feature", "bars": 2, "n": "02", "eyebrow": "Feature 02", "name": "Free beds", "line": "Every empty bed, filtered for who can move in.",
+      "clip": "clips/app_vacant.mp4", "clipFrom": 0.8, "clipTo": 5.8, "aspect": 2.1674, "color": "blue",
+      "pins": [ { "at": 1.4, "y": 0.42, "label": "Filter by men or women" } ] },
+    { "type": "feature", "bars": 2, "n": "03", "eyebrow": "Feature 03", "name": "Who's leaving", "line": "Notice dates and deposit refunds, worked out.",
+      "clip": "clips/app_notices.mp4", "clipFrom": 0.8, "clipTo": 4.8, "aspect": 2.1674, "color": "blue",
+      "pins": [ { "at": 1.4, "y": 0.33, "label": "Refund calculated" } ] },
+    { "type": "feature", "bars": 2, "n": "04", "eyebrow": "Feature 04", "name": "Every change logged", "line": "Who did what, and when. Nothing gets lost.",
+      "clip": "clips/app_activity.mp4", "clipFrom": 0.8, "clipTo": 4.6, "aspect": 2.1674, "color": "blue",
+      "pins": [ { "at": 1.4, "y": 0.2, "label": "Live activity feed" } ] },
+    { "type": "stack", "bars": 2, "title": "Simple, modern, owned by you",
+      "nodes": [
+        { "id": "app", "label": "Web app", "tech": "Next.js · works on any phone", "x": 0, "y": 1 },
+        { "id": "api", "label": "Backend", "tech": "Python · FastAPI", "x": 1, "y": 1 },
+        { "id": "db", "label": "Database", "tech": "PostgreSQL · Supabase", "x": 2, "y": 1 },
+        { "id": "wa", "label": "WhatsApp assistant", "tech": "same data, chat interface", "x": 1, "y": 0 }
+      ],
+      "edges": [ ["app", "api"], ["api", "db"], ["wa", "api"] ] },
+    { "type": "cta", "bars": 3, "q": "Want something like this for your business?",
+      "a": "Let’s explore what AI can do for you.", "button": "Let’s talk →" }
+  ]
+}

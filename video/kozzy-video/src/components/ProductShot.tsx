@@ -18,7 +18,8 @@ export const ProductShot: React.FC<{
   aspect: number;
   color: string;
   pins: Pin[];
-}> = ({ n, name, line, clip, clipFrom, clipTo, aspect, color, pins }) => {
+  eyebrow?: string; // defaults to "Product <n>"
+}> = ({ n, name, line, clip, clipFrom, clipTo, aspect, color, pins, eyebrow }) => {
   const f = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const rate = (clipTo - clipFrom) / (durationInFrames / fps);
@@ -31,7 +32,7 @@ export const ProductShot: React.FC<{
         color: "transparent", WebkitTextStroke: "2px rgba(255,255,255,0.09)",
         opacity: interpolate(f, [0, 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>{n}</div>
       <div style={{ position: "absolute", left: 160, top: 640, width: 520 }}>
-        <div style={{ ...rise(f, 4), fontSize: 22, fontWeight: 600, letterSpacing: "0.22em", textTransform: "uppercase", color }}>Product {n}</div>
+        <div style={{ ...rise(f, 4), fontSize: 22, fontWeight: 600, letterSpacing: "0.22em", textTransform: "uppercase", color }}>{eyebrow ?? `Product ${n}`}</div>
         <div style={{ ...rise(f, 8), fontSize: 84, fontWeight: 700, letterSpacing: "-0.045em", lineHeight: 1, marginTop: 14 }}>{name}</div>
         <div style={{ ...rise(f, 14), fontSize: 34, color: M.dim, lineHeight: 1.3, marginTop: 18 }}>{line}</div>
       </div>

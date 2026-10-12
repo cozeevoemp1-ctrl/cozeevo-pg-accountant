@@ -1,5 +1,5 @@
 // Record the REAL PWA (next dev on :3000, dev-login, sandbox API on :8100 with demo data).
-// node record_app.mjs collect|vacant|recent   -> out/app_<take>.mp4 (phone screen, 2x)
+// node record_app.mjs collect|vacant|recent|notices|activity   -> out/app_<take>.mp4 (phone screen, 2x)
 import { chromium } from 'playwright';
 import { startCapture } from './capture.mjs';
 
@@ -26,7 +26,7 @@ async function tap(locator, pause = 900) {
   await page.waitForTimeout(pause);
 }
 const scrollTo = async (y, ms = 900) => { await page.evaluate(y => window.scrollTo({ top: y, behavior: 'smooth' }), y); await page.waitForTimeout(ms); };
-const type = async (text) => { await page.keyboard.type(text, { delay: 110 }); await page.waitForTimeout(500); };
+const type = async (text) => { await page.keyboard.type(text, { delay: 70 }); await page.waitForTimeout(300); };
 
 const stop = await startCapture(page, `out/app_${TAKE}_frames`);
 await page.waitForTimeout(1000);
@@ -44,6 +44,12 @@ if (TAKE === 'collect') {
   await tap(page.getByText('Vacant beds', { exact: false }).first(), 1600);
   await tap(page.getByRole('button', { name: 'Male', exact: true }), 1600);
   await tap(page.getByRole('button', { name: 'Female', exact: true }), 1600);
+} else if (TAKE === 'notices') {
+  await tap(page.getByText('Notices', { exact: false }).first(), 1700);
+  await page.mouse.wheel(0, 350); await page.waitForTimeout(1400);
+} else if (TAKE === 'activity') {
+  await tap(page.getByText('Activity log', { exact: false }).first(), 1600);
+  await page.mouse.wheel(0, 300); await page.waitForTimeout(1300);
 } else if (TAKE === 'recent') {
   const sec = page.getByText('Recent payments', { exact: false }).first();
   await sec.scrollIntoViewIfNeeded();
