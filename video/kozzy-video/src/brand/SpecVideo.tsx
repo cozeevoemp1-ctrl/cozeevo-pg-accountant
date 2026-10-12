@@ -1,6 +1,6 @@
 import React from "react";
 import { Audio } from "@remotion/media";
-import { AbsoluteFill, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { M } from "../ui";
 import { ProductShot } from "../components/ProductShot";
 import { Hook } from "./Hook";
@@ -27,6 +27,8 @@ const Cut: React.FC<{ duration: number; last: boolean; children: React.ReactNode
 // Renders any brand-video spec. Every cut lands on a bar of the spec's BPM.
 export const SpecVideo: React.FC<{ spec: Spec }> = ({ spec }) => {
   const bar = barFrames(spec);
+  const { durationInFrames, fps } = useVideoConfig();
+  const fade = Math.round(2.5 * fps); // music always fades to silence on the last frame, whatever the cut length
   let at = 0;
   return (
     <AbsoluteFill style={{ background: M.bg }}>
@@ -39,7 +41,8 @@ export const SpecVideo: React.FC<{ spec: Spec }> = ({ spec }) => {
           </Sequence>
         );
       })}
-      <Audio src={staticFile(spec.music)} />
+      <Audio src={staticFile(spec.music)} volume={(f) => interpolate(f, [durationInFrames - fade, durationInFrames - 1], [1, 0],
+        { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} />
     </AbsoluteFill>
   );
 };

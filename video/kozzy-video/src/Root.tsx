@@ -8,7 +8,9 @@ import appDemo from "./specs/app-demo.json";
 import botDemo from "./specs/bot-demo.json";
 
 // Brand videos: one JSON spec each (src/specs/), rendered by SpecVideo — framework in ~/.claude/skills/brand-video.
-const SPECS = [appDemo, botDemo] as Spec[];
+const BASE = [appDemo, botDemo] as Spec[];
+// Every spec also gets a "-Short" cut without the how-it-works scene.
+const SPECS = BASE.flatMap((s) => [s, { ...s, id: `${s.id}-Short`, scenes: s.scenes.filter((sc) => sc.type !== "stack") }]);
 
 export const RemotionRoot: React.FC = () => {
   return (
