@@ -9,3 +9,5 @@ out
 # Regenerable: recordings (video/explainer/record_*.mjs), music (scripts/music.mjs)
 public/*.mp4
 public/*.wav
+public/clips/
+public/music/
