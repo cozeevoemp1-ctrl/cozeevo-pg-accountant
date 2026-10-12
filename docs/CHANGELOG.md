@@ -1,5 +1,22 @@
 # Changelog
 
+## Session AY — 2026-10-12 — Brand-video framework, 2 product demos + short cuts (no deploy)
+
+- **Framework**: `video/kozzy-video/src/brand/` renders any JSON spec (`src/specs/*.json`) as
+  Hook → product shots → how it works → CTA, cuts on 120 BPM bars, 30 fps. Skill:
+  `~/.claude/skills/brand-video/SKILL.md` (structure, Kiran's rules, workflow, gotchas).
+- **Demos** (sandbox data only): `AppDemo` (34 s, 4 PWA features) and `BotDemo` (30 s, WhatsApp
+  end-to-end incl. finance, labelled "Demo environment"). Every spec also renders `<Id>-Short`
+  without the how-it-works scene (30 s / 26 s). Music fades to silence on the last frame of any cut.
+- **Music**: ACE-Step 1.5 local (MIT), `scripts/gen_music.py` (needs `timesignature="4"` string).
+- **Upwork**: proposal saved to `~/Documents/Upwork_proposal_ListingCreator_2026-10-12.md`.
+- Generated clips/music/MP4s are gitignored — regenerate per `video/kozzy-video/README.md`.
+- **Not deployed**: video-only work; `development` also still holds the untested tenant-message
+  restore (`2445092`) — master stays gated on `tests/sandbox/run_all.sh`.
+- **Token note**: rendering is local (0 tokens); cost is image reviews + rework. Next video:
+  agree the spec first, one small contact sheet per render, review only changed scenes.
+
+
 ## Session AX — 2026-10-11 — Floor filter, explainer video, demo tooling; AW + AX deployed
 
 - **Deployed to prod** (`9391a97`, verified via `/healthz`). The merge also shipped all of
